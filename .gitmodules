@@ -6,4 +6,4 @@
 	url = https://github.com/Algebraic-Programming/TaskR.git
 [submodule "extern/DeployR"]
 	path = extern/DeployR
-	url = https://github.com/Algebraic-Programming/DeployR.git
+	url = https://github.com/Algebraic-Programming/DeployR/
