@@ -1,9 +1,3 @@
-option('engine', type : 'combo',
-       choices : [ 'mpi' ], 
-       description : 'Specifies which distributed execution engine to use',
-       value: 'mpi'
-       )
-
 option('buildTests', type : 'boolean', value : false,
        description: 'Indicates whether to build tests'
 )

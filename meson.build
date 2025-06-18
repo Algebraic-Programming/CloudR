@@ -6,19 +6,15 @@ project('CloudR', [ 'cpp'],
   ]
 )
 
-####### Storage for LLM-Engine dependencies
-
 CloudRDependencies = [ ]
 
-# Getting selected distributed engine
+####### Getting HiCR dependency
 
-engine = get_option('engine')
-
-####### Getting DeployR dependency
-
-DeployRProject = subproject('DeployR', required: true, default_options: [ 'engine=' + engine ])
-DeployRBuildDep = DeployRProject.get_variable('DeployRBuildDep')
-CloudRDependencies += DeployRBuildDep
+# Selecting default HiCR Backends
+HiCRBackends = [ 'mpi', 'hwloc', 'pthreads' ]
+HiCRProject = subproject('HiCR', required: true, default_options: [ 'backends=' + ','.join(HiCRBackends), 'frontends=RPCEngine,channel' ])
+HiCRBuildDep = HiCRProject.get_variable('hicrBuildDep')
+CloudRDependencies += HiCRBuildDep
 
 ####### Creating CloudR dependency
 
