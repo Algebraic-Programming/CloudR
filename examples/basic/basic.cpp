@@ -4,6 +4,7 @@
 
 int cloudRMain(int argc, char* argv[])
 {
+    printf("I am on main\n");
     return 0;
 }
 
@@ -30,5 +31,12 @@ int main(int argc, char *argv[])
     // Configuring emulated instance topologies
     cloudr.setInstanceTopologies(instanceTopologiesJs);
 
+    // Starting cloudr service
+    cloudr.startService();
+
+    // Stopping cloudr service();
+    cloudr.stopService();
+
+    // Finalizing cloudr
     cloudr.finalize();
 }

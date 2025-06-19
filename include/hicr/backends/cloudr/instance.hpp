@@ -24,6 +24,7 @@
 
 #include <hicr/core/instance.hpp>
 #include <hicr/core/topology.hpp>
+#include "device.hpp"
 
 namespace HiCR::backend::cloudr
 {
@@ -55,15 +56,25 @@ class Instance final : public HiCR::Instance
     return _isRoot;
   };
 
-  __INLINE__ void setTopology(const HiCR::Topology topology) { _topology = topology; }
+  __INLINE__ void setTopology(const nlohmann::json& topologyJs)
+  {
+    _topologyJs = topologyJs;
+
+    const auto& devicesJs = hicr::json::getArray<nlohmann::json>(topologyJs, "Devices");
+    _topology = HiCR::Topology();
+    for (const auto& deviceJs : devicesJs) _topology.addDevice(std::make_shared<cloudr::Device>(deviceJs));
+  }
 
   private:
 
-  /// Underlying instance implementing this instance
-  HiCR::Instance* const _baseInstance;
+  /// Already serialized topology
+  nlohmann::json _topologyJs;
 
   /// Emulated topology for this instance
   HiCR::Topology _topology;
+
+  /// Underlying instance implementing this instance
+  HiCR::Instance* const _baseInstance;
 
   /// A flag that determines whether this instance is root
   const bool _isRoot;

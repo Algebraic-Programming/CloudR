@@ -1,5 +1,140 @@
 {
     "Instance Topologies":
     [
+        {
+            "Devices":
+            [
+                {
+                    "Type": "NUMA Domain",
+                    "Compute Resources":
+                    [
+                       { "Type": "Processing Unit" },
+                       { "Type": "Processing Unit" },
+                       { "Type": "Processing Unit" },
+                       { "Type": "Processing Unit" },
+                       { "Type": "Processing Unit" },
+                       { "Type": "Processing Unit" },
+                       { "Type": "Processing Unit" },
+                       { "Type": "Processing Unit" }
+                    ],
+                    "Memory Spaces":
+                    [
+                       {
+                         "Type": "System RAM",
+                         "Size": 34359738368,
+                         "Usage": 0
+                       }
+                    ]
+                }
+            ]
+        },
+        {
+            "Devices":
+            [
+                {
+                    "Type": "NUMA Domain",
+                    "Compute Resources":
+                    [
+                       { "Type": "Processing Unit" },
+                       { "Type": "Processing Unit" },
+                       { "Type": "Processing Unit" },
+                       { "Type": "Processing Unit" },
+                       { "Type": "Processing Unit" },
+                       { "Type": "Processing Unit" },
+                       { "Type": "Processing Unit" },
+                       { "Type": "Processing Unit" }
+                    ],
+                    "Memory Spaces":
+                    [
+                       {
+                         "Type": "System RAM",
+                         "Size": 34359738368,
+                         "Usage": 0
+                       }
+                    ]
+                }
+            ]
+        },
+        {
+            "Devices":
+            [
+                {
+                    "Type": "NUMA Domain",
+                    "Compute Resources":
+                    [
+                       { "Type": "Processing Unit" },
+                       { "Type": "Processing Unit" },
+                       { "Type": "Processing Unit" },
+                       { "Type": "Processing Unit" },
+                       { "Type": "Processing Unit" },
+                       { "Type": "Processing Unit" },
+                       { "Type": "Processing Unit" },
+                       { "Type": "Processing Unit" }
+                    ],
+                    "Memory Spaces":
+                    [
+                       {
+                         "Type": "System RAM",
+                         "Size": 34359738368,
+                         "Usage": 0
+                       }
+                    ]
+                }
+            ]
+        },
+        {
+            "Devices":
+            [
+                {
+                    "Type": "NUMA Domain",
+                    "Compute Resources":
+                    [
+                       { "Type": "Processing Unit" },
+                       { "Type": "Processing Unit" },
+                       { "Type": "Processing Unit" },
+                       { "Type": "Processing Unit" },
+                       { "Type": "Processing Unit" },
+                       { "Type": "Processing Unit" },
+                       { "Type": "Processing Unit" },
+                       { "Type": "Processing Unit" }
+                    ],
+                    "Memory Spaces":
+                    [
+                       {
+                         "Type": "System RAM",
+                         "Size": 34359738368,
+                         "Usage": 0
+                       }
+                    ]
+                }
+            ]
+        },
+        {
+            "Devices":
+            [
+                {
+                    "Type": "NUMA Domain",
+                    "Compute Resources":
+                    [
+                       { "Type": "Processing Unit" },
+                       { "Type": "Processing Unit" },
+                       { "Type": "Processing Unit" },
+                       { "Type": "Processing Unit" },
+                       { "Type": "Processing Unit" },
+                       { "Type": "Processing Unit" },
+                       { "Type": "Processing Unit" },
+                       { "Type": "Processing Unit" }
+                    ],
+                    "Memory Spaces":
+                    [
+                       {
+                         "Type": "System RAM",
+                         "Size": 34359738368,
+                         "Usage": 0
+                       }
+                    ]
+                }
+            ]
+        }
     ]
 }
