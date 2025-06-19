@@ -65,6 +65,12 @@ class Instance final : public HiCR::Instance
     for (const auto& deviceJs : devicesJs) _topology.addDevice(std::make_shared<cloudr::Device>(deviceJs));
   }
 
+    __INLINE__ nlohmann::json&  getTopologyJs()
+  {
+    return _topologyJs;
+  }
+
+
   private:
 
   /// Already serialized topology

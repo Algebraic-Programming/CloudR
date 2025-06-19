@@ -23,8 +23,10 @@ class InstanceManager final : public HiCR::InstanceManager
 
   #define __CLOUDR_LAUNCH_MAIN_RPC_NAME "[CloudR] Launch Main"
   #define __CLOUDR_FINALIZE_WORKER_RPC_NAME "[CloudR] Finalize Worker"
+  #define __CLOUDR_REQUEST_TOPOLOGY_RPC_NAME "[CloudR] Request Topology"
 
-  typedef std::function<int(int argc, char** argv)> mainFc_t;
+
+  typedef std::function<int(HiCR::backend::cloudr::InstanceManager* cloudr, int argc, char** argv)> mainFc_t;
 
   InstanceManager(mainFc_t mainFunction) : HiCR::InstanceManager(), _mainFunction(mainFunction)
   {
@@ -41,7 +43,13 @@ class InstanceManager final : public HiCR::InstanceManager
     _computeManager       = std::make_unique<HiCR::backend::pthreads::ComputeManager>();
 
     // Storing arguments
-    for (int i = 0; i < *pargc; i++) _args.push_back((*pargv)[i]);
+    std::vector<std::string> args;
+    for (int i = 0; i < *pargc; i++) args.push_back((*pargv)[i]);
+
+    // Getting argc and argv values
+    _argc = args.size();
+    _argv = (char**) malloc (args.size() * sizeof(char*));
+    for (size_t i = 0; i < args.size(); i++) _argv[i] = (char*)args[i].c_str();
 
     // Reserving memory for hwloc
     hwloc_topology_init(&_hwlocTopology);
@@ -61,38 +69,49 @@ class InstanceManager final : public HiCR::InstanceManager
     _rpcEngine->initialize();
 
     // Registering launch function
-    auto launchMainExecutionUnit = HiCR::backend::pthreads::ComputeManager::createExecutionUnit([this](void *) { runMainFunction(); });
+    auto launchMainExecutionUnit = HiCR::backend::pthreads::ComputeManager::createExecutionUnit([this](void *) { runMainFunctionRPC(); });
     _rpcEngine->addRPCTarget(__CLOUDR_LAUNCH_MAIN_RPC_NAME, launchMainExecutionUnit);
 
     // Registering finalize function
     auto finalizeWorkerExecutionUnit = HiCR::backend::pthreads::ComputeManager::createExecutionUnit([this](void *) { finalizeWorker(); });
     _rpcEngine->addRPCTarget(__CLOUDR_FINALIZE_WORKER_RPC_NAME, finalizeWorkerExecutionUnit);
 
+    // Registering request topology function
+    auto requestTopologyExecutionUnit = HiCR::backend::pthreads::ComputeManager::createExecutionUnit([this](void *) { requestTopology(); });
+    _rpcEngine->addRPCTarget(__CLOUDR_REQUEST_TOPOLOGY_RPC_NAME, requestTopologyExecutionUnit);
+
     // Creating instance objects from the initially found instances now
     HiCR::Instance::instanceId_t instanceIdCounter = 0;
     for (auto& instance : _instanceManager->getInstances())
     {
      // Only the current instance is the root one
-     const bool isRoot = _instanceManager->getRootInstanceId() == _instanceManager->getCurrentInstance()->getId();
+     const bool isRoot = _instanceManager->getRootInstanceId() == instance->getId();
 
      // Creating new cloudr instance object (contains all the emulated information)
      auto newInstance = std::make_shared<HiCR::backend::cloudr::Instance>(instanceIdCounter, instance.get(), isRoot);
 
      // Adding instance to the collection
-     _instances.push_back(newInstance);
+     addInstance(newInstance);
 
-     // Increasing instance Id
+     // If this is the current instance, set it now
+     if (instance->getId() == _instanceManager->getCurrentInstance()->getId()) setCurrentInstance(newInstance);
+
+     // If it's root, remember the instance
+     if (isRoot) _rootInstance = newInstance.get();
+
+     // Linking base instance id to the respective cloudr instance
+     _baseIdsToCloudrInstanceMap[instance->getId()] = newInstance.get();
+
+     // Increasing cloudr instance Id
      instanceIdCounter++;
     }
 
-    // Print root status
+    // Main loop for running instances
     if (_instanceManager->getRootInstanceId() != _instanceManager->getCurrentInstance()->getId()) 
     {
-      printf("I am not root instance -- Listening\n");
       _continueListening = true;
       while(_continueListening) _rpcEngine->listen();
     } 
-
   }
 
   __INLINE__ void setInstanceTopologies(const nlohmann::json& instanceTopologiesJs)
@@ -100,14 +119,39 @@ class InstanceManager final : public HiCR::InstanceManager
     // This function will only be ran by the root rank
     if (_instanceManager->getRootInstanceId() != _instanceManager->getCurrentInstance()->getId()) return;
 
-    // Storing instance topologies
-    setInstanceTopologiesImpl(instanceTopologiesJs);
+    // Getting array of topologies
+    auto instanceTopologies = hicr::json::getArray<nlohmann::json>(instanceTopologiesJs, "Instance Topologies");
+
+    // Check whether the number of topologies passed coincides with the number of instances
+    if (instanceTopologies.size() != getInstances().size()) HICR_THROW_LOGIC("Trying to configure the topology of %lu instances, when %lu were actually created\n", instanceTopologies.size(), getInstances().size());
+
+    // Assigning topologies to each of the detected instances
+    for (size_t i = 0; i < getInstances().size(); i++)
+    {
+      // Grabbing the instance topology to emulate
+      const auto& instanceTopologyJs = instanceTopologies[i];
+
+      // Setting the instance's topology
+      const auto& cloudrInstance = (HiCR::backend::cloudr::Instance*)getInstances()[i].get();
+      cloudrInstance->setTopology(instanceTopologyJs);
+    }
   }
 
   __INLINE__ void startService()
   {
     // This function will only be ran by the root rank
     if (_instanceManager->getRootInstanceId() != _instanceManager->getCurrentInstance()->getId()) return;
+
+    // For each of the instances, as long as they're not root:
+
+    // (1) Request the execution of the main driver function
+    for (auto& instance : getInstances()) if (instance->isRootInstance() == false) _rpcEngine->requestRPC(*instance, __CLOUDR_LAUNCH_MAIN_RPC_NAME);
+
+    // (2) Listen for incoming topology information requests
+    for (auto& instance : getInstances()) if (instance->isRootInstance() == false) _rpcEngine->listen();
+
+    // Running main driver function ourselves
+    runMainFunctionImpl();
   }
 
   __INLINE__ void stopService()
@@ -116,7 +160,7 @@ class InstanceManager final : public HiCR::InstanceManager
     if (_instanceManager->getRootInstanceId() != _instanceManager->getCurrentInstance()->getId()) return;
 
     // Requesting others to shut down
-    for (auto& instance : _instances) _rpcEngine->requestRPC(*instance, __CLOUDR_FINALIZE_WORKER_RPC_NAME);
+    for (auto& instance : getInstances()) if (instance->isRootInstance() == false) _rpcEngine->requestRPC(*instance, __CLOUDR_FINALIZE_WORKER_RPC_NAME);
   }
 
   __INLINE__ void finalize() override
@@ -143,33 +187,55 @@ class InstanceManager final : public HiCR::InstanceManager
 
   private:
 
-  __INLINE__ void setInstanceTopologiesImpl(const nlohmann::json& instanceTopologiesJs)
+  __INLINE__ void runMainFunctionRPC()
   {
-    // Getting array of topologies
-    auto instanceTopologies = hicr::json::getArray<nlohmann::json>(instanceTopologiesJs, "Instance Topologies");
+    // Requesting the root 
+    _rpcEngine->requestRPC(*_rootInstance, __CLOUDR_REQUEST_TOPOLOGY_RPC_NAME);
 
-    // Check whether the number of topologies passed coincides with the number of instances
-    if (instanceTopologies.size() != _instances.size()) HICR_THROW_LOGIC("Trying to configure the topology of %lu instances, when %lu were actually created\n", instanceTopologies.size(), _instances.size());
+    // Getting return value (topology)
+    auto returnValue = _rpcEngine->getReturnValue(*_rootInstance);
 
-    // Assigning topologies to each of the detected instances
-    for (size_t i = 0; i < _instances.size(); i++)
-    {
-      // Grabbing the instance topology to emulate
-      const auto& instanceTopologyJs = instanceTopologies[i];
+    // Receiving raw serialized topology information from the worker
+    std::string serializedTopology = (char *)returnValue->getPointer();
 
-      // Setting the instance's topology
-      _instances[i]->setTopology(instanceTopologyJs);
-    }
+    // Parsing serialized raw topology into a json object
+    auto topologyJson = nlohmann::json::parse(serializedTopology);
+
+    // Freeing return value
+    _memoryManager->freeLocalMemorySlot(returnValue);
+
+    // Updating current instance's topology
+    static_cast<HiCR::backend::cloudr::Instance*>(getCurrentInstance().get())->setTopology(topologyJson);
+
+    // Running main function
+    runMainFunctionImpl();
   }
 
-  __INLINE__ void runMainFunction()
+  __INLINE__ void runMainFunctionImpl()
   {
-    // Getting argc and argv values
-    int argc = _args.size();
-    const char* argv[_args.size()];
-    for (size_t i = 0; i < _args.size(); i++) argv[i] = _args[i].c_str();
-    int retVal = _mainFunction(argc, (char**)argv);
-    printf("Retval: %d\n", retVal);
+    // Running main function
+    int retVal = _mainFunction(this, _argc, _argv);
+
+    // Checking return value
+    if (retVal != 0) HICR_THROW_RUNTIME("Instance %lu returned main with a non-zero (%d) error code", getCurrentInstance()->getId(), retVal);
+  }
+
+  __INLINE__ void requestTopology()
+  {
+    // Getting a pointer to the base instance who made the request
+    auto baseRequesterInstance = _rpcEngine->getRPCRequester();
+
+    // Getting base instance id
+    const auto baseInstanceId = baseRequesterInstance->getId();
+
+    // Getting cloudr instance from the base instance id
+    const auto cloudrInstance = _baseIdsToCloudrInstanceMap.at(baseInstanceId);
+
+    // Serializing topology information
+    const auto serializedTopology = cloudrInstance->getTopologyJs().dump();
+
+    // Returning serialized topology
+    _rpcEngine->submitReturnValue((void *)serializedTopology.c_str(), serializedTopology.size() + 1);
   }
 
   __INLINE__ void finalizeWorker()
@@ -177,7 +243,6 @@ class InstanceManager final : public HiCR::InstanceManager
     // Do not continue listening
     _continueListening = false;
   }
-
 
   /// Storage for the distributed engine's communication manager
   std::unique_ptr<HiCR::CommunicationManager> _communicationManager;
@@ -200,17 +265,24 @@ class InstanceManager final : public HiCR::InstanceManager
   /// Hwloc topology object
   hwloc_topology_t _hwlocTopology;
 
-  /// Storage for launch arguments
-  std::vector<std::string> _args;
+  /// Storage for launch arguments count
+  int _argc;
+
+  /// Storage for launch arguments values
+  char** _argv;
 
   /// Storage for the main function to run when a new instance runs
   const mainFc_t _mainFunction;
 
-  // Storage for the instance collection
-  std::vector<std::shared_ptr<HiCR::backend::cloudr::Instance>> _instances;
+  // Pointer to the root instance
+  HiCR::backend::cloudr::Instance* _rootInstance;
 
   // Flag to signal non-root instances to finish listening
   bool _continueListening;
+
+  // Map that links the underlying instance ids with the cloudr instances
+  std::map<HiCR::Instance::instanceId_t, HiCR::backend::cloudr::Instance*> _baseIdsToCloudrInstanceMap;
+  
 
 }; // class CloudR
 

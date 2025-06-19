@@ -2,14 +2,15 @@
 #include <fstream>
 #include <hicr/backends/cloudr/instanceManager.hpp>
 
-int cloudRMain(int argc, char* argv[])
+int cloudRMain(HiCR::backend::cloudr::InstanceManager* cloudr, int argc, char* argv[])
 {
-    printf("I am on main\n");
+    if (cloudr->getCurrentInstance()->getId() == cloudr->getRootInstanceId()) printf("Root: I am on main\n");
+    else printf("Non-Root: I am on main\n");
     return 0;
 }
 
 int main(int argc, char *argv[])
-{
+{ 
     HiCR::backend::cloudr::InstanceManager cloudr(cloudRMain);
     cloudr.initialize(&argc, &argv);
 
