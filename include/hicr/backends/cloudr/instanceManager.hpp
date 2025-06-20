@@ -90,14 +90,24 @@ class InstanceManager final : public HiCR::InstanceManager
      // Creating new cloudr instance object (contains all the emulated information)
      auto newInstance = std::make_shared<HiCR::backend::cloudr::Instance>(instanceIdCounter, instance.get(), isRoot);
 
-     // Adding instance to the collection
-     addInstance(newInstance);
+     // Adding new instance to the internal storage
+     _cloudrInstances.push_back(newInstance);
 
      // If this is the current instance, set it now
      if (instance->getId() == _instanceManager->getCurrentInstance()->getId()) setCurrentInstance(newInstance);
 
-     // If it's root, remember the instance
-     if (isRoot) _rootInstance = newInstance.get();
+     // If it's root, store its pointer
+     if (isRoot)
+     {
+      // Store root instance pointer for later referencing
+      _rootInstance = newInstance.get();
+
+      // Adding instance to the collection of currently active instances
+      addInstance(newInstance);
+     } 
+
+     // If not root, add to the list of free instances (can be activated later)
+     if (isRoot == false) _freeInstances.insert(newInstance);
 
      // Linking base instance id to the respective cloudr instance
      _baseIdsToCloudrInstanceMap[instance->getId()] = newInstance.get();
@@ -123,16 +133,16 @@ class InstanceManager final : public HiCR::InstanceManager
     auto instanceTopologies = hicr::json::getArray<nlohmann::json>(instanceTopologiesJs, "Instance Topologies");
 
     // Check whether the number of topologies passed coincides with the number of instances
-    if (instanceTopologies.size() != getInstances().size()) HICR_THROW_LOGIC("Trying to configure the topology of %lu instances, when %lu were actually created\n", instanceTopologies.size(), getInstances().size());
+    if (instanceTopologies.size() != _cloudrInstances.size()) HICR_THROW_LOGIC("Trying to configure the topology of %lu instances, when %lu were actually created\n", instanceTopologies.size(),_cloudrInstances.size());
 
     // Assigning topologies to each of the detected instances
-    for (size_t i = 0; i < getInstances().size(); i++)
+    for (size_t i = 0; i < _cloudrInstances.size(); i++)
     {
       // Grabbing the instance topology to emulate
       const auto& instanceTopologyJs = instanceTopologies[i];
 
       // Setting the instance's topology
-      const auto& cloudrInstance = (HiCR::backend::cloudr::Instance*)getInstances()[i].get();
+      const auto& cloudrInstance = _cloudrInstances[i].get();
       cloudrInstance->setTopology(instanceTopologyJs);
     }
   }
@@ -141,14 +151,6 @@ class InstanceManager final : public HiCR::InstanceManager
   {
     // This function will only be ran by the root rank
     if (_instanceManager->getRootInstanceId() != _instanceManager->getCurrentInstance()->getId()) return;
-
-    // For each of the instances, as long as they're not root:
-
-    // (1) Request the execution of the main driver function
-    for (auto& instance : getInstances()) if (instance->isRootInstance() == false) _rpcEngine->requestRPC(*instance, __CLOUDR_LAUNCH_MAIN_RPC_NAME);
-
-    // (2) Listen for incoming topology information requests
-    for (auto& instance : getInstances()) if (instance->isRootInstance() == false) _rpcEngine->listen();
 
     // Running main driver function ourselves
     runMainFunctionImpl();
@@ -160,7 +162,7 @@ class InstanceManager final : public HiCR::InstanceManager
     if (_instanceManager->getRootInstanceId() != _instanceManager->getCurrentInstance()->getId()) return;
 
     // Requesting others to shut down
-    for (auto& instance : getInstances()) if (instance->isRootInstance() == false) _rpcEngine->requestRPC(*instance, __CLOUDR_FINALIZE_WORKER_RPC_NAME);
+    for (auto& instance : _cloudrInstances) if (instance->isRootInstance() == false) _rpcEngine->requestRPC(*instance, __CLOUDR_FINALIZE_WORKER_RPC_NAME);
   }
 
   __INLINE__ void finalize() override
@@ -175,9 +177,46 @@ class InstanceManager final : public HiCR::InstanceManager
 
   protected:
 
-  __INLINE__ std::shared_ptr<HiCR::Instance> createInstanceImpl [[noreturn]] (const std::shared_ptr<HiCR::InstanceTemplate> &instanceTemplate) override
+  __INLINE__ std::shared_ptr<HiCR::Instance> createInstanceImpl (const HiCR::InstanceTemplate instanceTemplate) override
   {
-    HICR_THROW_LOGIC("The MPI backend does not currently support the launching of new instances during runtime");
+    // If no more free instances available, fail now
+    // Commented out because we don't want to fail, simply return a nullptr
+    // if (_freeInstances.empty()) HICR_THROW_LOGIC("Requested the creation of a new instances, but CloudR has ran out of free instances");
+
+    // Creating instance object to return
+    std::shared_ptr<HiCR::backend::cloudr::Instance> newInstance = nullptr; 
+
+    // Getting requested topology from the instance template
+    const auto& topology = instanceTemplate.getTopology();
+
+    // Iterating over free instances to get the first one that satisfies the request
+    for (const auto& instance : _freeInstances) if (instance->isCompatible(topology))
+    {
+      // Assigning it as compatible instance
+      newInstance = instance;
+
+      // Erasing it from the list of free instances
+      _freeInstances.erase(instance);
+
+      // Stop looking into the others
+      break;
+    }
+
+    // Commented out because we don't want to fail, simply return a nullptr
+    // if (newInstance == nullptr)  HICR_THROW_LOGIC("Tried to create new instance but did not find any free instances that meet the required topology");
+
+    // If successful, initialize the new instance
+    if (newInstance != nullptr)
+    {
+      // (1) Request the execution of the main driver function
+      _rpcEngine->requestRPC(*newInstance->getBaseInstance(), __CLOUDR_LAUNCH_MAIN_RPC_NAME);
+
+      // (2) Listen for incoming topology information requests
+      _rpcEngine->listen();
+    }
+
+    // Returning result. Nullptr, if no instance was created
+    return newInstance;
   }
 
   __INLINE__ std::shared_ptr<HiCR::Instance> addInstanceImpl(HiCR::Instance::instanceId_t instanceId) override
@@ -283,6 +322,11 @@ class InstanceManager final : public HiCR::InstanceManager
   // Map that links the underlying instance ids with the cloudr instances
   std::map<HiCR::Instance::instanceId_t, HiCR::backend::cloudr::Instance*> _baseIdsToCloudrInstanceMap;
   
+  /// Internal collection of cloudr instances
+  std::vector<std::shared_ptr<HiCR::backend::cloudr::Instance>> _cloudrInstances;
+
+  /// A collection of ready-to-use instances currently on standby
+  std::set<std::shared_ptr<HiCR::backend::cloudr::Instance>> _freeInstances;
 
 }; // class CloudR
 
