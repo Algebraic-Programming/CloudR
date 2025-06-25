@@ -40,10 +40,10 @@ class Instance final : public HiCR::Instance
    * Constructor for a Instance class for the MPI backend
    * \param[in] instanceId The base instance identifier corresponding to this HiCR instance
    */
-  Instance(const instanceId_t instanceId, HiCR::Instance* const baseInstance, const bool isRoot)
+  Instance(const instanceId_t instanceId, HiCR::Instance *const baseInstance, const bool isRoot)
     : HiCR::Instance(instanceId),
-       _baseInstance(baseInstance),
-       _isRoot(isRoot)
+      _baseInstance(baseInstance),
+      _isRoot(isRoot)
   {}
 
   /**
@@ -51,24 +51,18 @@ class Instance final : public HiCR::Instance
    */
   ~Instance() override = default;
 
-  [[nodiscard]] __INLINE__ bool isRootInstance() const override
-  {
-    return _isRoot;
-  };
+  [[nodiscard]] __INLINE__ bool isRootInstance() const override { return _isRoot; };
 
-  __INLINE__ void setTopology(const nlohmann::json& topologyJs)
+  __INLINE__ void setTopology(const nlohmann::json &topologyJs)
   {
     _topologyJs = topologyJs;
 
-    const auto& devicesJs = hicr::json::getArray<nlohmann::json>(topologyJs, "Devices");
-    _topology = HiCR::Topology();
-    for (const auto& deviceJs : devicesJs) _topology.addDevice(std::make_shared<cloudr::Device>(deviceJs));
+    const auto &devicesJs = hicr::json::getArray<nlohmann::json>(topologyJs, "Devices");
+    _topology             = HiCR::Topology();
+    for (const auto &deviceJs : devicesJs) _topology.addDevice(std::make_shared<cloudr::Device>(deviceJs));
   }
 
-    __INLINE__ nlohmann::json&  getTopologyJs()
-  {
-    return _topologyJs;
-  }
+  __INLINE__ nlohmann::json &getTopologyJs() { return _topologyJs; }
 
   /**
   * Checks whether this instance satisfied a certain instance type.
@@ -115,11 +109,12 @@ class Instance final : public HiCR::Instance
           ///// Checking requested compute resources
           auto instanceComputeResources = instanceDevice->getComputeResourceList();
 
-          // Getting compute resources in this instance device 
+          // Getting compute resources in this instance device
           for (const auto &requestedComputeResource : requestedDeviceComputeResources)
           {
             bool foundComputeResource = false;
-            for (auto instanceComputeResourceItr = instanceComputeResources.begin(); instanceComputeResourceItr != instanceComputeResources.end() && foundComputeResource == false; instanceComputeResourceItr++)
+            for (auto instanceComputeResourceItr = instanceComputeResources.begin(); instanceComputeResourceItr != instanceComputeResources.end() && foundComputeResource == false;
+                 instanceComputeResourceItr++)
             {
               // Getting instance device object
               const auto &instanceComputeResource = instanceComputeResourceItr.operator*();
@@ -134,26 +129,27 @@ class Instance final : public HiCR::Instance
                 instanceComputeResources.erase(instanceComputeResourceItr);
               }
             }
-            
+
             // If no compute resource was found, abandon search in this device
             if (foundComputeResource == false)
             {
               deviceIsCompatible = false;
               break;
-            } 
+            }
           }
-          
+
           // If no suitable device was found, advance with the next one
           if (deviceIsCompatible == false) continue;
 
           ///// Checking requested compute resources
-          auto instanceMemorySpaces= instanceDevice->getMemorySpaceList();
+          auto instanceMemorySpaces = instanceDevice->getMemorySpaceList();
 
-          // Getting compute resources in this instance device 
+          // Getting compute resources in this instance device
           for (const auto &requestedDeviceMemorySpace : requestedDeviceMemorySpaces)
           {
             bool foundMemorySpace = false;
-            for (auto instanceMemorySpaceItr = instanceMemorySpaces.begin(); instanceMemorySpaceItr != instanceMemorySpaces.end() && foundMemorySpace == false; instanceMemorySpaceItr++)
+            for (auto instanceMemorySpaceItr = instanceMemorySpaces.begin(); instanceMemorySpaceItr != instanceMemorySpaces.end() && foundMemorySpace == false;
+                 instanceMemorySpaceItr++)
             {
               // Getting instance device object
               const auto &instanceDeviceMemorySpace = instanceMemorySpaceItr.operator*();
@@ -172,13 +168,13 @@ class Instance final : public HiCR::Instance
                 }
               }
             }
-            
+
             // If no compute resource was found, abandon search in this device
             if (foundMemorySpace == false)
             {
               deviceIsCompatible = false;
               break;
-            } 
+            }
           }
 
           // If no suitable device was found, advance with the next one
@@ -204,7 +200,7 @@ class Instance final : public HiCR::Instance
     return true;
   }
 
-  __INLINE__ HiCR::Instance* getBaseInstance() const { return _baseInstance; }
+  __INLINE__ HiCR::Instance *getBaseInstance() const { return _baseInstance; }
 
   private:
 
@@ -215,7 +211,7 @@ class Instance final : public HiCR::Instance
   HiCR::Topology _topology;
 
   /// Underlying instance implementing this instance
-  HiCR::Instance* const _baseInstance;
+  HiCR::Instance *const _baseInstance;
 
   /// A flag that determines whether this instance is root
   const bool _isRoot;
@@ -224,4 +220,4 @@ class Instance final : public HiCR::Instance
   bool _isDeployed = false;
 };
 
-} // namespace HiCR::backend::mpi
+} // namespace HiCR::backend::cloudr

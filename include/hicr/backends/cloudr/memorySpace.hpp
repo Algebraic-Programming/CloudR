@@ -41,7 +41,8 @@ class MemorySpace final : public HiCR::MemorySpace
    *
    * @param[in] input A JSON-encoded serialized host RAM information
    */
-  MemorySpace(const nlohmann::json &input): HiCR::MemorySpace()
+  MemorySpace(const nlohmann::json &input)
+    : HiCR::MemorySpace()
   {
     deserialize(input);
   }
@@ -58,15 +59,9 @@ class MemorySpace final : public HiCR::MemorySpace
   /// Mutable type
   std::string _type;
 
-  __INLINE__ void serializeImpl(nlohmann::json &output) const override
-  {
-  }
+  __INLINE__ void serializeImpl(nlohmann::json &output) const override {}
 
-  __INLINE__ void deserializeImpl(const nlohmann::json &input) override
-  {
-    _type = input["Type"].get<std::string>();
-  }
-
+  __INLINE__ void deserializeImpl(const nlohmann::json &input) override { _type = input["Type"].get<std::string>(); }
 };
 
 } // namespace HiCR::backend::cloudr

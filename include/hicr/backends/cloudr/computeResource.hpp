@@ -40,11 +40,12 @@ class ComputeResource final : public HiCR::ComputeResource
   /**
    * Constructor for the compute resource class of cloudr
    */
-  ComputeResource(const nlohmann::json &input) : HiCR::ComputeResource()
+  ComputeResource(const nlohmann::json &input)
+    : HiCR::ComputeResource()
   {
     deserialize(input);
   }
-  
+
   ~ComputeResource() override = default;
 
   /**
@@ -56,14 +57,9 @@ class ComputeResource final : public HiCR::ComputeResource
 
   protected:
 
-  __INLINE__ void serializeImpl(nlohmann::json &output) const override
-  {
-  }
+  __INLINE__ void serializeImpl(nlohmann::json &output) const override {}
 
-  __INLINE__ void deserializeImpl(const nlohmann::json &input) override
-  {
-    _type = input["Type"].get<std::string>();
-  }
+  __INLINE__ void deserializeImpl(const nlohmann::json &input) override { _type = input["Type"].get<std::string>(); }
 
   private:
 
@@ -71,4 +67,4 @@ class ComputeResource final : public HiCR::ComputeResource
   std::string _type;
 };
 
-} // namespace HiCR::backend::hwloc
+} // namespace HiCR::backend::cloudr

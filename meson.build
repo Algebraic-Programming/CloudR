@@ -8,13 +8,19 @@ project('CloudR', [ 'cpp'],
 
 CloudRDependencies = [ ]
 
-####### Getting HiCR dependency
+####### Getting HiCR dependency (if this is a standalone project)
+
+CloudRHiCRBackends = [ 'mpi', 'hwloc', 'pthreads' ]
+CloudRHiCRFrontends = [ 'RPCEngine', 'channel' ]
+
+if meson.is_subproject() == false
 
 # Selecting default HiCR Backends
-HiCRBackends = [ 'mpi', 'hwloc', 'pthreads' ]
-HiCRProject = subproject('HiCR', required: true, default_options: [ 'backends=' + ','.join(HiCRBackends), 'frontends=RPCEngine,channel' ])
+HiCRProject = subproject('HiCR', required: true, default_options: [ 'backends=' + ','.join(CloudRHiCRBackends), 'frontends=' + ','.join(CloudRHiCRFrontends) ])
 HiCRBuildDep = HiCRProject.get_variable('hicrBuildDep')
 CloudRDependencies += HiCRBuildDep
+
+endif
 
 ####### Creating CloudR dependency
 

@@ -38,17 +38,15 @@ class Device final : public HiCR::Device
 {
   public:
 
-
   /**
    * Constructor for the device class of the HWLoC backend
    *
    * @param[in] computeResources The compute resources (cores or hyperthreads) detected in this device (CPU)
    * @param[in] memorySpaces The memory spaces (e.g., NUMA domains) detected in this device (CPU)
    */
-  Device(const std::string& type, const computeResourceList_t &computeResources, const memorySpaceList_t &memorySpaces)
+  Device(const std::string &type, const computeResourceList_t &computeResources, const memorySpaceList_t &memorySpaces)
     : HiCR::Device(computeResources, memorySpaces),
-      _type(type)
-      {};
+      _type(type){};
 
   /**
    * Empty constructor for serialization / deserialization
@@ -93,7 +91,7 @@ class Device final : public HiCR::Device
   __INLINE__ void deserializeImpl(const nlohmann::json &input) override
   {
     _type = hicr::json::getString(input, "Type");
-    
+
     // Iterating over the compute resource list
     for (const auto &computeResource : input[_HICR_DEVICE_COMPUTE_RESOURCES_KEY_])
     {
