@@ -167,6 +167,8 @@ class InstanceManager final : public HiCR::InstanceManager
   [[nodiscard]] __INLINE__ auto getMemoryManager() const { return _memoryManager; }
   [[nodiscard]] __INLINE__ auto getComputeManager() const { return _computeManager; }
   [[nodiscard]] __INLINE__ auto getCommunicationManager() const { return _communicationManager; }
+  [[nodiscard]] __INLINE__ auto getTopologyManager() const { return _topologyManager; }
+  [[nodiscard]] __INLINE__ auto getRPCEngine() const { return _rpcEngine.get(); }
 
   protected:
 
