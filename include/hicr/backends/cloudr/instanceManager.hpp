@@ -25,6 +25,9 @@ class InstanceManager final : public HiCR::InstanceManager
 #define __CLOUDR_FINALIZE_WORKER_RPC_NAME "[CloudR] Finalize Worker"
 #define __CLOUDR_REQUEST_TOPOLOGY_RPC_NAME "[CloudR] Request Topology"
 
+// Communication Manager RPCs
+#define __CLOUDR_EXCHANGE_GLOBAL_MEMORY_SLOTS_RPC_NAME "[CloudR] Exchange Global Memory Slots"
+
   typedef std::function<int(HiCR::backend::cloudr::InstanceManager *cloudr, int argc, char **argv)> mainFc_t;
 
   InstanceManager(mainFc_t mainFunction)
@@ -79,6 +82,10 @@ class InstanceManager final : public HiCR::InstanceManager
     // Registering request topology function
     auto requestTopologyExecutionUnit = HiCR::backend::pthreads::ComputeManager::createExecutionUnit([this](void *) { requestTopology(); });
     _rpcEngine->addRPCTarget(__CLOUDR_REQUEST_TOPOLOGY_RPC_NAME, requestTopologyExecutionUnit);
+
+    // Registering exchange global memory slots RPC
+    auto exchangeGlobalMemorySlotsExecutionUnit = HiCR::backend::pthreads::ComputeManager::createExecutionUnit([this](void *) { exchangeGlobalMemorySlotsRPC(); });
+    _rpcEngine->addRPCTarget(__CLOUDR_EXCHANGE_GLOBAL_MEMORY_SLOTS_RPC_NAME, exchangeGlobalMemorySlotsExecutionUnit);
 
     // Creating instance objects from the initially found instances now
     HiCR::Instance::instanceId_t instanceIdCounter = 0;
@@ -169,6 +176,7 @@ class InstanceManager final : public HiCR::InstanceManager
   [[nodiscard]] __INLINE__ auto getCommunicationManager() const { return _communicationManager; }
   [[nodiscard]] __INLINE__ auto getTopologyManager() const { return _topologyManager; }
   [[nodiscard]] __INLINE__ auto getRPCEngine() const { return _rpcEngine.get(); }
+  [[nodiscard]] __INLINE__ const auto& getFreeInstances() const { return _freeInstances; }
 
   protected:
 
@@ -277,6 +285,11 @@ class InstanceManager final : public HiCR::InstanceManager
   {
     // Do not continue listening
     _continueListening = false;
+  }
+
+  __INLINE__ void exchangeGlobalMemorySlotsRPC()
+  {
+    printf("Running exchange slots RPC\n");
   }
 
   /// Storage for the distributed engine's communication manager

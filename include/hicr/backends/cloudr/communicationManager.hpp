@@ -89,8 +89,13 @@ class CommunicationManager final : public HiCR::CommunicationManager
 
   __INLINE__ void exchangeGlobalMemorySlotsImpl(HiCR::GlobalMemorySlot::tag_t tag, const std::vector<globalKeyMemorySlotPair_t> &memorySlots) override
   {
-    printf("Exchanging global memory slots\n");
-    const auto RPCEngine = _instanceManager->getRPCEngine();
+    // If I am root, I need to send an RPC to the 'free' instances to perform this exchange
+    if (_instanceManager->getRootInstanceId() == _instanceManager->getCurrentInstance()->getId())
+    {
+      printf("Requesting free instances to exchange global memory slots\n");
+      const auto RPCEngine = _instanceManager->getRPCEngine();
+      for (auto& instance : _instanceManager->getFreeInstances())  RPCEngine->requestRPC(*instance, __CLOUDR_EXCHANGE_GLOBAL_MEMORY_SLOTS_RPC_NAME);
+    }
 
     _instanceManager->getCommunicationManager()->exchangeGlobalMemorySlots(tag, memorySlots);
   }
@@ -111,8 +116,8 @@ class CommunicationManager final : public HiCR::CommunicationManager
   }
 
   std::shared_ptr<HiCR::GlobalMemorySlot> getGlobalMemorySlotImpl(HiCR::GlobalMemorySlot::tag_t tag, HiCR::GlobalMemorySlot::globalKey_t globalKey) override { return nullptr; }
-
   HiCR::backend::cloudr::InstanceManager* const _instanceManager;
+
 };
 
 } // namespace HiCR::backend::cloudr

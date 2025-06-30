@@ -12,8 +12,8 @@ int cloudRMain(HiCR::backend::cloudr::InstanceManager *cloudr, int argc, char *a
   else
     printf("Non-Root: I am on main\n");
 
+  auto communicationManager = HiCR::backend::cloudr::CommunicationManager(cloudr);
   auto memoryManager = cloudr->getMemoryManager();
-  auto communicationManager = cloudr->getCommunicationManager();
   auto topologyManager = cloudr->getTopologyManager();
 
   // Getting current process id
@@ -39,10 +39,10 @@ int cloudRMain(HiCR::backend::cloudr::InstanceManager *cloudr, int argc, char *a
   auto bufferSlot = memoryManager->allocateLocalMemorySlot(firstMemSpace, bufferSize);
 
   // Exchanging communicator tag
-  communicationManager->exchangeGlobalMemorySlots(bufferTag, {{myInstanceId, bufferSlot}});
+  communicationManager.exchangeGlobalMemorySlots(bufferTag, {{myInstanceId, bufferSlot}});
 
   // Synchronizing so that all actors have finished registering their global memory slots
-  communicationManager->fence(bufferTag);
+  communicationManager.fence(bufferTag);
 
   // If I'm root, create new instance
   if (isRoot)
