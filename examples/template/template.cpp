@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <fstream>
 #include <hicr/backends/cloudr/instanceManager.hpp>
-#include <hicr/backends/cloudr/communicationManager.hpp>
 #include <hicr/backends/hwloc/device.hpp>
 
 int cloudRMain(HiCR::backend::cloudr::InstanceManager *cloudr, int argc, char *argv[])

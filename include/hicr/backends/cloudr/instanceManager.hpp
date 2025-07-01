@@ -27,6 +27,7 @@ class InstanceManager final : public HiCR::InstanceManager
 
 // Communication Manager RPCs
 #define __CLOUDR_EXCHANGE_GLOBAL_MEMORY_SLOTS_RPC_NAME "[CloudR] Exchange Global Memory Slots"
+#define __CLOUDR_FENCE_RPC_NAME "[CloudR] Fence"
 
   typedef std::function<int(HiCR::backend::cloudr::InstanceManager *cloudr, int argc, char **argv)> mainFc_t;
 
@@ -86,6 +87,10 @@ class InstanceManager final : public HiCR::InstanceManager
     // Registering exchange global memory slots RPC
     auto exchangeGlobalMemorySlotsExecutionUnit = HiCR::backend::pthreads::ComputeManager::createExecutionUnit([this](void *) { exchangeGlobalMemorySlotsRPC(); });
     _rpcEngine->addRPCTarget(__CLOUDR_EXCHANGE_GLOBAL_MEMORY_SLOTS_RPC_NAME, exchangeGlobalMemorySlotsExecutionUnit);
+    
+    // Registering global fence
+    auto fenceExecutionUnit = HiCR::backend::pthreads::ComputeManager::createExecutionUnit([this](void *) { fenceRPC(); });
+    _rpcEngine->addRPCTarget(__CLOUDR_FENCE_RPC_NAME, fenceExecutionUnit);
 
     // Creating instance objects from the initially found instances now
     HiCR::Instance::instanceId_t instanceIdCounter = 0;
@@ -289,9 +294,16 @@ class InstanceManager final : public HiCR::InstanceManager
 
   __INLINE__ void exchangeGlobalMemorySlotsRPC()
   {
-    printf("Running exchange slots RPC\n");
+    const auto exchangeTag = _rpcEngine->getRPCArgument();
+    _communicationManager->exchangeGlobalMemorySlots(exchangeTag, {});
   }
 
+  __INLINE__ void fenceRPC()
+  {
+    const auto exchangeTag = _rpcEngine->getRPCArgument();
+    _communicationManager->fence(exchangeTag);
+  }
+  
   /// Storage for the distributed engine's communication manager
   std::shared_ptr<HiCR::CommunicationManager> _communicationManager;
 
