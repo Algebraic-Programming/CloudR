@@ -24,7 +24,6 @@
 
 #include <hicr/core/instance.hpp>
 #include <hicr/core/topology.hpp>
-#include "device.hpp"
 
 namespace HiCR::backend::cloudr
 {
@@ -59,7 +58,7 @@ class Instance final : public HiCR::Instance
 
     const auto &devicesJs = hicr::json::getArray<nlohmann::json>(topologyJs, "Devices");
     _topology             = HiCR::Topology();
-    for (const auto &deviceJs : devicesJs) _topology.addDevice(std::make_shared<cloudr::Device>(deviceJs));
+    for (const auto &deviceJs : devicesJs) _topology.addDevice(std::make_shared<HiCR::Device>(deviceJs));
   }
 
   __INLINE__ nlohmann::json &getTopologyJs() { return _topologyJs; }
