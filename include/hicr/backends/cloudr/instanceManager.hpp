@@ -12,7 +12,9 @@
 #include <hicr/frontends/RPCEngine/RPCEngine.hpp>
 #include <nlohmann_json/json.hpp>
 #include <nlohmann_json/parser.hpp>
+#include <functional>
 #include "instance.hpp"
+#include "communicationManager.hpp"
 
 namespace HiCR::backend::cloudr
 {
@@ -27,7 +29,7 @@ class InstanceManager final : public HiCR::InstanceManager
 
 // Communication Manager RPCs
 #define __CLOUDR_EXCHANGE_GLOBAL_MEMORY_SLOTS_RPC_NAME "[CloudR] Exchange Global Memory Slots"
-#define __CLOUDR_FENCE_RPC_NAME "[CloudR] Fence"
+#define __CLOUDR_FENCE_RPC_NAME "[CloudR] Fence" 
 
   typedef std::function<int(HiCR::backend::cloudr::InstanceManager *cloudr, int argc, char **argv)> mainFc_t;
 
@@ -38,11 +40,11 @@ class InstanceManager final : public HiCR::InstanceManager
 
   ~InstanceManager() {}
 
-  __INLINE__ void initialize(int *pargc, char ***pargv)
+  __INLINE__ void initialize(int *pargc, char ***pargv, std::function<void()> postInitCallback = [](){})
   {
     // Initializing instance
     _instanceManager      = HiCR::backend::mpi::InstanceManager::createDefault(pargc, pargv);
-    _communicationManager = std::make_shared<HiCR::backend::mpi::CommunicationManager>(MPI_COMM_WORLD);
+    _communicationManager = std::make_shared<HiCR::backend::cloudr::CommunicationManager>(this);
     _memoryManager        = std::make_shared<HiCR::backend::mpi::MemoryManager>();
     _computeManager       = std::make_shared<HiCR::backend::pthreads::ComputeManager>();
 
@@ -128,12 +130,27 @@ class InstanceManager final : public HiCR::InstanceManager
       instanceIdCounter++;
     }
 
+    // Calling post-initialization callback
+    postInitCallback();
+
     // Main loop for running instances
     if (_instanceManager->getRootInstanceId() != _instanceManager->getCurrentInstance()->getId())
     {
       _continueListening = true;
       while (_continueListening) _rpcEngine->listen();
     }
+  }
+
+  __INLINE__ void requestExchangeGlobalMemorySlots(HiCR::GlobalMemorySlot::tag_t tag)
+  {
+    // Asking free instances to run the exchange RPC
+    for (const auto& instance : _freeInstances) _rpcEngine->requestRPC(*instance, __CLOUDR_EXCHANGE_GLOBAL_MEMORY_SLOTS_RPC_NAME, tag);
+  }
+
+    __INLINE__ void requestFence(HiCR::GlobalMemorySlot::tag_t tag)
+  {
+    // Asking free instances to run the exchange RPC
+    for (const auto& instance : _freeInstances) _rpcEngine->requestRPC(*instance, __CLOUDR_FENCE_RPC_NAME, tag);
   }
 
   __INLINE__ void setInstanceTopologies(const nlohmann::json &instanceTopologiesJs)
@@ -352,3 +369,5 @@ class InstanceManager final : public HiCR::InstanceManager
 }; // class CloudR
 
 } // namespace HiCR::backend::cloudr
+
+#include "communicationManagerImpl.hpp"
