@@ -45,6 +45,7 @@ class InstanceManager final : public HiCR::InstanceManager
     // Initializing instance
     _instanceManager      = HiCR::backend::mpi::InstanceManager::createDefault(pargc, pargv);
     _communicationManager = std::make_shared<HiCR::backend::cloudr::CommunicationManager>(this);
+    _baseCommunicationManager = std::make_shared<HiCR::backend::mpi::CommunicationManager>(MPI_COMM_WORLD);
     _memoryManager        = std::make_shared<HiCR::backend::mpi::MemoryManager>();
     _computeManager       = std::make_shared<HiCR::backend::pthreads::ComputeManager>();
 
@@ -69,7 +70,7 @@ class InstanceManager final : public HiCR::InstanceManager
     auto RPCComputeResource = firstDevice->getComputeResourceList().begin().operator*();
 
     // Instantiating RPC engine
-    _rpcEngine = std::make_unique<HiCR::frontend::RPCEngine>(*_communicationManager, *_instanceManager, *_memoryManager, *_computeManager, RPCMemorySpace, RPCComputeResource);
+    _rpcEngine = std::make_unique<HiCR::frontend::RPCEngine>(*_baseCommunicationManager, *_instanceManager, *_memoryManager, *_computeManager, RPCMemorySpace, RPCComputeResource);
 
     // Initializing RPC engine
     _rpcEngine->initialize();
@@ -134,7 +135,7 @@ class InstanceManager final : public HiCR::InstanceManager
     postInitCallback();
 
     // Main loop for running instances
-    if (_instanceManager->getRootInstanceId() != _instanceManager->getCurrentInstance()->getId())
+    if (_instanceManager->getCurrentInstance()->isRootInstance() == false)
     {
       _continueListening = true;
       while (_continueListening) _rpcEngine->listen();
@@ -305,6 +306,7 @@ class InstanceManager final : public HiCR::InstanceManager
 
   __INLINE__ void finalizeWorker()
   {
+    printf("recieved RPC to finalize worker\n");
     // Do not continue listening
     _continueListening = false;
   }
@@ -321,8 +323,11 @@ class InstanceManager final : public HiCR::InstanceManager
     _communicationManager->fence(exchangeTag);
   }
   
-  /// Storage for the distributed engine's communication manager
+  /// Storage for the distributed engine's communication manager, to be exposed to the upper layer
   std::shared_ptr<HiCR::CommunicationManager> _communicationManager;
+
+  /// Storage for the base distributed engine's communication manager to be used for the RPC engine
+  std::shared_ptr<HiCR::CommunicationManager> _baseCommunicationManager;
 
   /// Storage for the distributed engine's instance manager
   std::unique_ptr<HiCR::InstanceManager> _instanceManager;
