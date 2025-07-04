@@ -306,7 +306,6 @@ class InstanceManager final : public HiCR::InstanceManager
 
   __INLINE__ void finalizeWorker()
   {
-    printf("recieved RPC to finalize worker\n");
     // Do not continue listening
     _continueListening = false;
   }
