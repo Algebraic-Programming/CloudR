@@ -180,11 +180,10 @@ class InstanceManager final : public HiCR::InstanceManager
 
   __INLINE__ void finalize() override
   {
-    // The following only be ran by the root rank
+    // The following only be ran by the root rank, send an RPC to all others to finalize them
     if (_instanceManager->getRootInstanceId() == _instanceManager->getCurrentInstance()->getId())
-      // Send an RPC to all others to finalize them
-      for (auto &instance : _cloudrInstances)
-        if (instance->isRootInstance() == false) _rpcEngine->requestRPC(*instance, __CLOUDR_FINALIZE_WORKER_RPC_NAME);
+      for (auto &instance : _cloudrInstances) if (instance->isRootInstance() == false)
+       _rpcEngine->requestRPC(*instance, __CLOUDR_FINALIZE_WORKER_RPC_NAME);
 
     // Finalizing underlying instance manager
     _instanceManager->finalize();
