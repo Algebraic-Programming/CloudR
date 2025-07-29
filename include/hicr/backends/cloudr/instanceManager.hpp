@@ -137,9 +137,15 @@ class InstanceManager final : public HiCR::InstanceManager
     // Main loop for running instances
     if (_instanceManager->getCurrentInstance()->isRootInstance() == false)
     {
-      _continueListening = true;
-      while (_continueListening) _rpcEngine->listen();
+      while (_continueListening) 
+      {
+        printf("[CloudR] Worker %lu listening...\n", _instanceManager->getCurrentInstance()->getId()); fflush(stdout);
+        _rpcEngine->listen();
+        printf("[CloudR] Worker %lu back from listening...\n", _instanceManager->getCurrentInstance()->getId()); fflush(stdout);
+      }
     }
+
+    printf("[CloudR] Worker %lu finished.\n", _instanceManager->getCurrentInstance()->getId());
   }
 
   __INLINE__ void requestExchangeGlobalMemorySlots(HiCR::GlobalMemorySlot::tag_t tag)
@@ -182,8 +188,11 @@ class InstanceManager final : public HiCR::InstanceManager
   {
     // The following only be ran by the root rank, send an RPC to all others to finalize them
     if (_instanceManager->getRootInstanceId() == _instanceManager->getCurrentInstance()->getId())
+    {
+      printf("[Root] Finalizing CloudR...\n");
       for (auto &instance : _cloudrInstances) if (instance->isRootInstance() == false)
        _rpcEngine->requestRPC(*instance, __CLOUDR_FINALIZE_WORKER_RPC_NAME);
+    }
 
     // Finalizing underlying instance manager
     _instanceManager->finalize();
@@ -306,6 +315,7 @@ class InstanceManager final : public HiCR::InstanceManager
   __INLINE__ void finalizeWorker()
   {
     // Do not continue listening
+    printf("[CloudR] Worker %lu running finalizeWorker() RPC.\n", _instanceManager->getCurrentInstance()->getId());
     _continueListening = false;
   }
 
@@ -358,7 +368,7 @@ class InstanceManager final : public HiCR::InstanceManager
   HiCR::backend::cloudr::Instance *_rootInstance;
 
   // Flag to signal non-root instances to finish listening
-  bool _continueListening;
+  bool _continueListening = true;
 
   // Map that links the underlying instance ids with the cloudr instances
   std::map<HiCR::Instance::instanceId_t, HiCR::backend::cloudr::Instance *> _baseIdsToCloudrInstanceMap;
