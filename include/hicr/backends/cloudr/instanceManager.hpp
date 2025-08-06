@@ -160,13 +160,13 @@ class InstanceManager final : public HiCR::InstanceManager
     for (const auto& instance : _freeInstances) _rpcEngine->requestRPC(*instance, __CLOUDR_FENCE_RPC_NAME, tag);
   }
 
-  __INLINE__ void setInstanceTopologies(const nlohmann::json &instanceTopologiesJs)
+  __INLINE__ void setConfiguration(const nlohmann::json &configurationJs)
   {
     // This function will only be ran by the root rank
     if (_instanceManager->getRootInstanceId() != _instanceManager->getCurrentInstance()->getId()) return;
 
     // Getting array of topologies
-    auto instanceTopologies = hicr::json::getArray<nlohmann::json>(instanceTopologiesJs, "Instance Topologies");
+    auto instanceTopologies = hicr::json::getArray<nlohmann::json>(configurationJs, "Instance Topologies");
 
     // Check whether the number of topologies passed coincides with the number of instances
     if (instanceTopologies.size() != _cloudrInstances.size())
