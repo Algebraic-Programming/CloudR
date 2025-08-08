@@ -72,10 +72,10 @@ int main(int argc, char *argv[])
 
     // Parsing request file contents to a JSON object
     std::ifstream ifs(instanceTopologiesFilePath);
-    auto          instanceTopologiesJs = nlohmann::json::parse(ifs);
+    auto          configurationJS = nlohmann::json::parse(ifs);
 
     // Configuring emulated instance topologies
-    cloudr.setInstanceTopologies(instanceTopologiesJs);
+    cloudr.setConfiguration(configurationJS);
 
     // Calling what's supposed to be cloudR main
     cloudRMain(&cloudr, argc, argv);

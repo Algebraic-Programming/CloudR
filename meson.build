@@ -18,6 +18,7 @@ if meson.is_subproject() == false
 # Selecting default HiCR Backends
 HiCRProject = subproject('HiCR', required: true, default_options: [ 'backends=' + ','.join(CloudRHiCRBackends), 'frontends=' + ','.join(CloudRHiCRFrontends) ])
 HiCRBuildDep = HiCRProject.get_variable('hicrBuildDep')
+mpirunExecutable = HiCRProject.get_variable('mpirunExecutable')
 CloudRDependencies += HiCRBuildDep
 
 endif
