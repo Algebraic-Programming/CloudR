@@ -51,7 +51,29 @@ int cloudRMain(HiCR::backend::cloudr::InstanceManager *cloudr, int argc, char *a
 int main(int argc, char *argv[])
 {
   HiCR::backend::cloudr::InstanceManager cloudr(cloudRMain);
-  cloudr.initialize(&argc, &argv);
+  // Reserving memory for hwloc
+  hwloc_topology_t hwlocTopology;
+  hwloc_topology_init(&hwlocTopology);
+
+  // Initializing HWLoc-based host (CPU) topology manager
+  auto hwlocTopologyManager = HiCR::backend::hwloc::TopologyManager(&hwlocTopology);
+
+  // Finding the first memory space and compute resource to create our RPC engine
+  auto firstDevice        = hwlocTopologyManager.queryTopology().getDevices().begin().operator*();
+  auto RPCMemorySpace     = firstDevice->getMemorySpaceList().begin().operator*();
+  auto RPCComputeResource = firstDevice->getComputeResourceList().begin().operator*();
+
+  auto mpiInstanceManager      = HiCR::backend::mpi::InstanceManager::createDefault(&argc, &argv);
+  auto mpiCommunicationManager = std::make_shared<HiCR::backend::mpi::CommunicationManager>(MPI_COMM_WORLD);
+  auto communicationManager    = std::make_shared<HiCR::backend::cloudr::CommunicationManager>(&cloudr, MPI_COMM_WORLD);
+  auto memoryManager           = std::make_shared<HiCR::backend::mpi::MemoryManager>();
+  auto computeManager          = std::make_shared<HiCR::backend::pthreads::ComputeManager>();
+  auto topologyManager         = std::make_shared<HiCR::backend::cloudr::TopologyManager>();
+
+  auto rpcEngine = std::make_shared<HiCR::frontend::RPCEngine>(*mpiCommunicationManager, *mpiInstanceManager, *memoryManager, *computeManager, RPCMemorySpace, RPCComputeResource);
+
+  // Initialize CloudR
+  cloudr.initialize(&argc, &argv, std::move(mpiInstanceManager), communicationManager, memoryManager, computeManager, topologyManager, rpcEngine);
 
   // Checking if I'm root
   bool isRoot = cloudr.getCurrentInstance()->getId() == cloudr.getRootInstanceId();

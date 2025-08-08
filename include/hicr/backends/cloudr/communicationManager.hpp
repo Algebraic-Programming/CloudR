@@ -47,8 +47,8 @@ class CommunicationManager final : public HiCR::backend::mpi::CommunicationManag
    * \param[in] comm The CloudR subcommunicator to use in the communication operations in this backend.
    * If not specified, it will use CloudR_COMM_WORLD
    */
-  CommunicationManager(HiCR::backend::cloudr::InstanceManager *const cloudrInstanceManager)
-    : HiCR::backend::mpi::CommunicationManager(MPI_COMM_WORLD),
+  CommunicationManager(HiCR::backend::cloudr::InstanceManager *const cloudrInstanceManager, MPI_Comm communicator)
+    : HiCR::backend::mpi::CommunicationManager(communicator),
       _cloudrInstanceManager(cloudrInstanceManager)
   {}
 
