@@ -32,7 +32,7 @@
 namespace HiCR::backend::cloudr
 {
 
-class InstanceManager;  
+class InstanceManager;
 
 /**
  * Implementation of the CloudR backend
@@ -47,10 +47,10 @@ class CommunicationManager final : public HiCR::backend::mpi::CommunicationManag
    * \param[in] comm The CloudR subcommunicator to use in the communication operations in this backend.
    * If not specified, it will use CloudR_COMM_WORLD
    */
-  CommunicationManager(HiCR::backend::cloudr::InstanceManager* const cloudrInstanceManager) : HiCR::backend::mpi::CommunicationManager(MPI_COMM_WORLD),
-  _cloudrInstanceManager(cloudrInstanceManager)
-  {
-  }
+  CommunicationManager(HiCR::backend::cloudr::InstanceManager *const cloudrInstanceManager)
+    : HiCR::backend::mpi::CommunicationManager(MPI_COMM_WORLD),
+      _cloudrInstanceManager(cloudrInstanceManager)
+  {}
 
   ~CommunicationManager() override = default;
 
@@ -59,7 +59,7 @@ class CommunicationManager final : public HiCR::backend::mpi::CommunicationManag
 
   private:
 
-  HiCR::backend::cloudr::InstanceManager* const _cloudrInstanceManager;  
+  HiCR::backend::cloudr::InstanceManager *const _cloudrInstanceManager;
 };
 
 } // namespace HiCR::backend::cloudr
