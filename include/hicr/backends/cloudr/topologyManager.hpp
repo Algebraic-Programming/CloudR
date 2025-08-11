@@ -21,9 +21,9 @@
 
 /**
  * @file topologyManager.hpp
- * @brief This file implements the TopologyManager class for the Ascend Backend
- * @author L. Terracciano & S. M. Martin
- * @date 18/12/2023
+ * @brief This file implements the TopologyManager class for the CloudR Backend
+ * @author L. Terracciano
+ * @date 11/08/2025
  */
 
 #pragma once
@@ -37,7 +37,7 @@ namespace HiCR::backend::cloudr
 {
 
 /**
- * Implementation of the topology manager for the discovery and use of Ascend devices
+ * Implementation of the topology manager for the discovery and use of CloudR devices
  */
 class TopologyManager final : public HiCR::TopologyManager
 {

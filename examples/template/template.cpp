@@ -15,13 +15,13 @@ int cloudRMain(HiCR::backend::cloudr::InstanceManager *cloudr, int argc, char *a
   if (isRoot)
   {
     // Creating HWloc topology object
-    hwloc_topology_t topology;
+    hwloc_topology_t hwlocTopology;
 
     // Reserving memory for hwloc
-    hwloc_topology_init(&topology);
+    hwloc_topology_init(&hwlocTopology);
 
     // Initializing HWLoc-based host (CPU) topology manager
-    HiCR::backend::hwloc::TopologyManager tm(&topology);
+    HiCR::backend::hwloc::TopologyManager tm(&hwlocTopology);
 
     // Detecting my own local topology
     const auto localTopology = tm.queryTopology();
@@ -65,7 +65,7 @@ int main(int argc, char *argv[])
 
   auto mpiInstanceManager      = HiCR::backend::mpi::InstanceManager::createDefault(&argc, &argv);
   auto mpiCommunicationManager = std::make_shared<HiCR::backend::mpi::CommunicationManager>(MPI_COMM_WORLD);
-  auto communicationManager    = std::make_shared<HiCR::backend::cloudr::CommunicationManager>(&cloudr, MPI_COMM_WORLD);
+  auto communicationManager    = std::make_shared<HiCR::backend::cloudr::CommunicationManager>(&cloudr, mpiCommunicationManager.get());
   auto memoryManager           = std::make_shared<HiCR::backend::mpi::MemoryManager>();
   auto computeManager          = std::make_shared<HiCR::backend::pthreads::ComputeManager>();
   auto topologyManager         = std::make_shared<HiCR::backend::cloudr::TopologyManager>();
