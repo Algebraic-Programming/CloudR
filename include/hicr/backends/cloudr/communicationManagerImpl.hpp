@@ -16,7 +16,7 @@ __INLINE__ void HiCR::backend::cloudr::CommunicationManager::exchangeGlobalMemor
   if (_cloudrInstanceManager->getCurrentInstance()->isRootInstance()) _cloudrInstanceManager->requestExchangeGlobalMemorySlots(tag);
 
   // Initiate the exchange
-  _cloudrInstanceManager->getCommunicationManager()->exchangeGlobalMemorySlots(tag, memorySlots);
+  _baseCommunicationManager->exchangeGlobalMemorySlots(tag, memorySlots);
 
   // Keep track of the initiated exchange
   _isExchangePending = true;
