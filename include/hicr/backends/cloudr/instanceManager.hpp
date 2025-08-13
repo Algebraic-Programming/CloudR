@@ -74,9 +74,6 @@ class InstanceManager final : public HiCR::InstanceManager
     _argv = (char **)malloc(args.size() * sizeof(char *));
     for (size_t i = 0; i < args.size(); i++) _argv[i] = (char *)args[i].c_str();
 
-    // Initializing RPC engine
-    _rpcEngine->initialize();
-
     // Registering launch function
     auto launchMainExecutionUnit = HiCR::backend::pthreads::ComputeManager::createExecutionUnit([this](void *) { runMainFunctionRPC(); });
     _rpcEngine->addRPCTarget(__CLOUDR_LAUNCH_MAIN_RPC_NAME, launchMainExecutionUnit);

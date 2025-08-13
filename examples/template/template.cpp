@@ -72,6 +72,9 @@ int main(int argc, char *argv[])
 
   auto rpcEngine = std::make_shared<HiCR::frontend::RPCEngine>(*mpiCommunicationManager, *mpiInstanceManager, *memoryManager, *computeManager, RPCMemorySpace, RPCComputeResource);
 
+  //Initialize RPC Engine
+  rpcEngine->initialize();
+  
   // Initialize CloudR
   cloudr.initialize(&argc, &argv, std::move(mpiInstanceManager), communicationManager, memoryManager, computeManager, topologyManager, rpcEngine);
 
