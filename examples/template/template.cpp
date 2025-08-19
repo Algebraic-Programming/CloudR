@@ -1,56 +1,35 @@
-#include <stdio.h>
 #include <fstream>
+#include <nlohmann_json/json.hpp>
 #include <hicr/backends/cloudr/instanceManager.hpp>
-#include <hicr/backends/hwloc/device.hpp>
-
-int cloudRMain(HiCR::backend::cloudr::InstanceManager *cloudr, int argc, char *argv[])
-{
-  bool isRoot = cloudr->getCurrentInstance()->getId() == cloudr->getRootInstanceId();
-  if (isRoot)
-    printf("Root: I am on main\n");
-  else
-    printf("Non-Root: I am on main\n");
-
-  // If I'm root, create new instance
-  if (isRoot)
-  {
-    // Creating HWloc topology object
-    hwloc_topology_t hwlocTopology;
-
-    // Reserving memory for hwloc
-    hwloc_topology_init(&hwlocTopology);
-
-    // Initializing HWLoc-based host (CPU) topology manager
-    HiCR::backend::hwloc::TopologyManager tm(&hwlocTopology);
-
-    // Detecting my own local topology
-    const auto localTopology = tm.queryTopology();
-
-    // Creating a new (reduced) topology
-    HiCR::Topology newTopology;
-
-    // Adding a single device (NUMA Domain) to it
-    auto newDevice = std::make_shared<HiCR::backend::hwloc::Device>();
-    newDevice->addComputeResource(localTopology.getDevices().begin().operator*()->getComputeResourceList().begin().operator*());
-    newDevice->addMemorySpace(localTopology.getDevices().begin().operator*()->getMemorySpaceList().begin().operator*());
-    newTopology.addDevice(newDevice);
-
-    // Requesting the creation of the new topology
-    HiCR::InstanceTemplate it(newTopology);
-    auto                   newInstance = cloudr->createInstance(it);
-    if (newInstance == nullptr)
-    {
-      fprintf(stderr, "Error: Failed to create new instance.\n");
-      return -1;
-    }
-  }
-
-  return 0;
-}
+#include <hicr/backends/cloudr/communicationManager.hpp>
+#include <hicr/backends/cloudr/topologyManager.hpp>
+#include <hicr/backends/mpi/communicationManager.hpp>
+#include <hicr/backends/mpi/memoryManager.hpp>
+#include <hicr/backends/mpi/instanceManager.hpp>
+#include <hicr/backends/hwloc/topologyManager.hpp>
 
 int main(int argc, char *argv[])
 {
-  HiCR::backend::cloudr::InstanceManager cloudr(cloudRMain);
+    // Instantiating base managers
+  auto instanceManager         = HiCR::backend::mpi::InstanceManager::createDefault(&argc, &argv);
+  auto communicationManager    = HiCR::backend::mpi::CommunicationManager(MPI_COMM_WORLD);
+  auto memoryManager           = HiCR::backend::mpi::MemoryManager();
+  auto computeManager          = HiCR::backend::pthreads::ComputeManager();
+
+  // Checking if I'm root
+  bool isRoot = instanceManager->getCurrentInstance()->isRootInstance();
+
+  // Checking arguments
+  if (argc != 2)
+  {
+    if (isRoot == true) fprintf(stderr, "Error: Must provide a CloudR JSON configuration file.\n");
+    instanceManager->abort(-1);
+    return -1;
+  }
+
+  // Getting CloudR configuration file name from arguments
+  std::string cloudrConfigurationFilePath = std::string(argv[1]);
+
   // Reserving memory for hwloc
   hwloc_topology_t hwlocTopology;
   hwloc_topology_init(&hwlocTopology);
@@ -59,53 +38,50 @@ int main(int argc, char *argv[])
   auto hwlocTopologyManager = HiCR::backend::hwloc::TopologyManager(&hwlocTopology);
 
   // Finding the first memory space and compute resource to create our RPC engine
-  auto firstDevice        = hwlocTopologyManager.queryTopology().getDevices().begin().operator*();
-  auto RPCMemorySpace     = firstDevice->getMemorySpaceList().begin().operator*();
-  auto RPCComputeResource = firstDevice->getComputeResourceList().begin().operator*();
-
-  auto mpiInstanceManager      = HiCR::backend::mpi::InstanceManager::createDefault(&argc, &argv);
-  auto mpiCommunicationManager = std::make_shared<HiCR::backend::mpi::CommunicationManager>(MPI_COMM_WORLD);
-  auto communicationManager    = std::make_shared<HiCR::backend::cloudr::CommunicationManager>(&cloudr, mpiCommunicationManager.get());
-  auto memoryManager           = std::make_shared<HiCR::backend::mpi::MemoryManager>();
-  auto computeManager          = std::make_shared<HiCR::backend::pthreads::ComputeManager>();
-  auto topologyManager         = std::make_shared<HiCR::backend::cloudr::TopologyManager>();
-
-  auto rpcEngine = std::make_shared<HiCR::frontend::RPCEngine>(*mpiCommunicationManager, *mpiInstanceManager, *memoryManager, *computeManager, RPCMemorySpace, RPCComputeResource);
-
-  //Initialize RPC Engine
-  rpcEngine->initialize();
+  const auto& topology           = hwlocTopologyManager.queryTopology();
+  const auto& firstDevice        = topology.getDevices().begin().operator*();
+  const auto& RPCMemorySpace     = firstDevice->getMemorySpaceList().begin().operator*();
+  const auto& RPCComputeResource = firstDevice->getComputeResourceList().begin().operator*();
   
-  // Initialize CloudR
-  cloudr.initialize(&argc, &argv, std::move(mpiInstanceManager), communicationManager, memoryManager, computeManager, topologyManager, rpcEngine);
+  // Instantiating RPC engine
+  HiCR::frontend::RPCEngine rpcEngine(communicationManager, *instanceManager, memoryManager, computeManager, RPCMemorySpace, RPCComputeResource);
 
-  // Checking if I'm root
-  bool isRoot = cloudr.getCurrentInstance()->getId() == cloudr.getRootInstanceId();
+  // Initializing RPC engine
+  rpcEngine.initialize();
 
-  // Only do the following if I'm root
+  // Instanciating CloudR
+  auto cloudrInstanceManager = HiCR::backend::cloudr::InstanceManager(&rpcEngine);
+  auto cloudrTopologyManager = HiCR::backend::cloudr::TopologyManager(&cloudrInstanceManager);
+
+  // Lambda representing cloudr's entry point
+  auto entryPoint = [&]()
+  {
+    printf("Hello\n");
+  };
+
+  // Initializing CloudR
+  cloudrInstanceManager.initialize();
+
+  // Setting CloudR's entry point
+  cloudrInstanceManager.setEntryPoint(entryPoint);
+
+  // If I am the root, I need to configure the CloudR environment
   if (isRoot)
   {
-    // Checking arguments
-    if (argc != 2)
-    {
-      fprintf(stderr, "Error: Must provide a JSON file with a list of instance topologies as argument.\n");
-      cloudr.abort(-1);
-      return -1;
-    }
-
-    // Getting request file name from arguments
-    std::string instanceTopologiesFilePath = std::string(argv[1]);
-
-    // Parsing request file contents to a JSON object
-    std::ifstream ifs(instanceTopologiesFilePath);
-    auto          configurationJS = nlohmann::json::parse(ifs);
+    // Parsing CloudR configuration file contents to a JSON object
+    std::ifstream ifs(cloudrConfigurationFilePath);
+    auto          cloudrConfigurationJs = nlohmann::json::parse(ifs);
 
     // Configuring emulated instance topologies
-    cloudr.setConfiguration(configurationJS);
-
-    // Calling what's supposed to be cloudR main
-    cloudRMain(&cloudr, argc, argv);
+    cloudrInstanceManager.setConfiguration(cloudrConfigurationJs);
   }
 
-  // Finalizing cloudr
-  cloudr.finalize();
+  // Deploying CloudR
+  cloudrInstanceManager.deploy();
+  
+  // Finalizing cloudR
+  cloudrInstanceManager.finalize();
+
+  // Finalizing base instance manager
+  instanceManager->finalize();
 }

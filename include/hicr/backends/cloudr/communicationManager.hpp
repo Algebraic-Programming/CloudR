@@ -27,12 +27,11 @@
 #include <hicr/core/localMemorySlot.hpp>
 #include <hicr/core/communicationManager.hpp>
 #include <hicr/backends/mpi/communicationManager.hpp>
+#include <hicr/backends/cloudr/instanceManager.hpp>
 #include "instanceManager.hpp"
 
 namespace HiCR::backend::cloudr
 {
-
-class InstanceManager;
 
 /**
  * Implementation of the CloudR backend
@@ -46,45 +45,187 @@ class CommunicationManager final : public HiCR::CommunicationManager
    *
    * \param[in] cloudrInstanceManager The CloudR Instance Manager
    */
-  CommunicationManager(HiCR::backend::cloudr::InstanceManager *const cloudrInstanceManager, HiCR::CommunicationManager *communicationManager)
+  CommunicationManager(HiCR::CommunicationManager *communicationManager, HiCR::backend::cloudr::InstanceManager* instanceManager)
     : HiCR::CommunicationManager(),
-      _cloudrInstanceManager(cloudrInstanceManager),
-      _baseCommunicationManager(communicationManager)
+      _communicationManager(communicationManager),
+      _instanceManager(instanceManager)
   {}
 
   ~CommunicationManager() override = default;
 
-  std::shared_ptr<GlobalMemorySlot> getGlobalMemorySlotImpl(GlobalMemorySlot::tag_t tag, GlobalMemorySlot::globalKey_t globalKey) override;
-  void                              exchangeGlobalMemorySlotsImpl(HiCR::GlobalMemorySlot::tag_t tag, const std::vector<globalKeyMemorySlotPair_t> &memorySlots) override;
-  void                              queryMemorySlotUpdatesImpl(std::shared_ptr<LocalMemorySlot> memorySlot) override;
-  void                              destroyGlobalMemorySlotImpl(std::shared_ptr<GlobalMemorySlot> memorySlot) override;
-  void                              fenceImpl(HiCR::GlobalMemorySlot::tag_t tag) override;
-  bool                              acquireGlobalLockImpl(std::shared_ptr<GlobalMemorySlot> memorySlot) override;
-  void                              releaseGlobalLockImpl(std::shared_ptr<GlobalMemorySlot> memorySlot) override;
+std::shared_ptr<GlobalMemorySlot> getGlobalMemorySlotImpl(GlobalMemorySlot::tag_t tag, GlobalMemorySlot::globalKey_t globalKey)
+{
+  // Forward call to base communication manager
+  return _communicationManager->getGlobalMemorySlot(tag, globalKey);
+}
+__INLINE__ void exchangeGlobalMemorySlotsImpl(HiCR::GlobalMemorySlot::tag_t                 tag,
+                                                                                           const std::vector<globalKeyMemorySlotPair_t> &memorySlots)
+{
+  // Request non active instances to participate in the exchange
+  if (_instanceManager->getCurrentInstance()->isRootInstance()) _instanceManager->requestExchangeGlobalMemorySlots(tag);
 
-  void                              lock() override;
-  void                              unlock() override;
-  uint8_t                          *serializeGlobalMemorySlot(const std::shared_ptr<HiCR::GlobalMemorySlot> &globalSlot) const override;
-  std::shared_ptr<GlobalMemorySlot> deserializeGlobalMemorySlot(uint8_t *buffer, GlobalMemorySlot::tag_t tag) override;
-  std::shared_ptr<GlobalMemorySlot> promoteLocalMemorySlot(const std::shared_ptr<LocalMemorySlot> &localMemorySlot, GlobalMemorySlot::tag_t tag) override;
-  void                              destroyPromotedGlobalMemorySlot(const std::shared_ptr<GlobalMemorySlot> &memorySlot) override;
-  virtual void                      flushReceived() override;
-  virtual void                      flushSent() override;
-  void                              deregisterGlobalMemorySlotImpl(const std::shared_ptr<GlobalMemorySlot> &memorySlot) override;
-  void memcpyImpl(const std::shared_ptr<LocalMemorySlot> &destination, size_t dst_offset, const std::shared_ptr<LocalMemorySlot> &source, size_t src_offset, size_t size) override;
-  void memcpyImpl(const std::shared_ptr<GlobalMemorySlot> &destination, size_t dst_offset, const std::shared_ptr<LocalMemorySlot> &source, size_t src_offset, size_t size) override;
-  void memcpyImpl(const std::shared_ptr<LocalMemorySlot> &destination, size_t dst_offset, const std::shared_ptr<GlobalMemorySlot> &source, size_t src_offset, size_t size) override;
-  void fenceImpl(const std::shared_ptr<LocalMemorySlot> &slot, size_t expectedSent, size_t expectedRcvd) override;
-  void fenceImpl(const std::shared_ptr<GlobalMemorySlot> &slot, size_t expectedSent, size_t expectedRcvd) override;
+  // Initiate the exchange
+  _communicationManager->exchangeGlobalMemorySlots(tag, memorySlots);
+
+  // Keep track of the initiated exchange
+  _isExchangePending = true;
+}
+
+void queryMemorySlotUpdatesImpl(std::shared_ptr<LocalMemorySlot> memorySlot)
+{
+  // Forward call to base communication manager
+  _communicationManager->queryMemorySlotUpdates(memorySlot);
+}
+
+void destroyGlobalMemorySlotImpl(std::shared_ptr<GlobalMemorySlot> memorySlot)
+{
+  // Forward call to base communication manager
+  _communicationManager->destroyGlobalMemorySlot(memorySlot);
+}
+
+__INLINE__ void fenceImpl(HiCR::GlobalMemorySlot::tag_t tag)
+{
+  // Request non active instances to participate in the fence
+  if (_instanceManager->getCurrentInstance()->isRootInstance()) _instanceManager->requestFence(tag);
+
+  // Execute the fence
+  _communicationManager->fence(tag);
+
+  // If any exchange operation was initiated
+  if (_isExchangePending == true)
+  {
+    // Get the global memory slot tag-key map
+    const auto &globalMap = _communicationManager->getGlobalMemorySlotTagKeyMap();
+
+    // Update CloudR global memory slot tag-key map
+    setGlobalMemorySlotTagKeyMap(globalMap);
+
+    // All the changes of the exchange operations are reflected in CloudR
+    _isExchangePending = false;
+  }
+}
+
+bool acquireGlobalLockImpl(std::shared_ptr<GlobalMemorySlot> memorySlot)
+{
+  // Forward call to base communication manager
+  return _communicationManager->acquireGlobalLock(memorySlot);
+}
+
+void releaseGlobalLockImpl(std::shared_ptr<GlobalMemorySlot> memorySlot)
+{
+  // Forward call to base communication manager
+  return _communicationManager->releaseGlobalLock(memorySlot);
+}
+
+void lock()
+{
+  // Forward call to base communication manager
+  // _communicationManager->lock();
+}
+
+void unlock()
+{
+  // Forward call to base communication manager
+  // _communicationManager->unlock();
+}
+
+uint8_t *serializeGlobalMemorySlot(const std::shared_ptr<HiCR::GlobalMemorySlot> &globalSlot) const
+{
+  // Forward call to base communication manager
+  return _communicationManager->serializeGlobalMemorySlot(globalSlot);
+}
+
+std::shared_ptr<GlobalMemorySlot> deserializeGlobalMemorySlot(uint8_t *buffer, GlobalMemorySlot::tag_t tag)
+{
+  // Forward call to base communication manager
+  return _communicationManager->deserializeGlobalMemorySlot(buffer, tag);
+}
+
+std::shared_ptr<GlobalMemorySlot> promoteLocalMemorySlot(const std::shared_ptr<LocalMemorySlot> &localMemorySlot,
+                                                                                                      GlobalMemorySlot::tag_t                 tag)
+{
+  // Forward call to base communication manager
+  return _communicationManager->promoteLocalMemorySlot(localMemorySlot, tag);
+}
+
+void destroyPromotedGlobalMemorySlot(const std::shared_ptr<GlobalMemorySlot> &memorySlot)
+{
+  // Forward call to base communication manager
+  _communicationManager->destroyGlobalMemorySlot(memorySlot);
+}
+
+void flushReceived()
+{
+  // Forward call to base communication manager
+  _communicationManager->flushReceived();
+}
+
+void flushSent()
+{
+  // Forward call to base communication manager
+  _communicationManager->flushSent();
+}
+
+void deregisterGlobalMemorySlotImpl(const std::shared_ptr<GlobalMemorySlot> &memorySlot)
+{
+  // Forward call to base communication manager
+  _communicationManager->deregisterGlobalMemorySlot(memorySlot);
+}
+
+void memcpyImpl(const std::shared_ptr<LocalMemorySlot> &destination,
+                                                             size_t                                  dst_offset,
+                                                             const std::shared_ptr<LocalMemorySlot> &source,
+                                                             size_t                                  src_offset,
+                                                             size_t                                  size)
+{
+  // Forward call to base communication manager
+  _communicationManager->memcpy(destination, dst_offset, source, src_offset, size);
+}
+
+void memcpyImpl(const std::shared_ptr<GlobalMemorySlot> &destination,
+                                                             size_t                                   dst_offset,
+                                                             const std::shared_ptr<LocalMemorySlot>  &source,
+                                                             size_t                                   src_offset,
+                                                             size_t                                   size)
+{
+  // Forward call to base communication manager
+  _communicationManager->memcpy(destination, dst_offset, source, src_offset, size);
+}
+
+void memcpyImpl(const std::shared_ptr<LocalMemorySlot>  &destination,
+                                                             size_t                                   dst_offset,
+                                                             const std::shared_ptr<GlobalMemorySlot> &source,
+                                                             size_t                                   src_offset,
+                                                             size_t                                   size)
+{
+  // Forward call to base communication manager
+  _communicationManager->memcpy(destination, dst_offset, source, src_offset, size);
+}
+
+void fenceImpl(const std::shared_ptr<LocalMemorySlot> &slot, size_t expectedSent, size_t expectedRcvd)
+{
+  // Forward call to base communication manager
+  _communicationManager->fence(slot, expectedSent, expectedRcvd);
+}
+
+void fenceImpl(const std::shared_ptr<GlobalMemorySlot> &slot, size_t expectedSent, size_t expectedRcvd)
+{
+  // Forward call to base communication manager
+  _communicationManager->fence(slot, expectedSent, expectedRcvd);
+}
+
 
   private:
-
-  HiCR::backend::cloudr::InstanceManager *const _cloudrInstanceManager;
 
   /**
    * HiCR Communication manager that does the actual operations
   */
-  HiCR::CommunicationManager *_baseCommunicationManager;
+  HiCR::CommunicationManager * const _communicationManager;
+
+  /**
+   * HiCR Instance manager to check whether this is a root instance
+  */
+  HiCR::backend::cloudr::InstanceManager* const _instanceManager;
 
   /**
    * Keep track if there are pending exchanges operations

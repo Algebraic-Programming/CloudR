@@ -32,6 +32,7 @@
 #include <hicr/core/device.hpp>
 #include <hicr/core/topology.hpp>
 #include <hicr/core/topologyManager.hpp>
+#include "instanceManager.hpp"
 
 namespace HiCR::backend::cloudr
 {
@@ -46,8 +47,9 @@ class TopologyManager final : public HiCR::TopologyManager
   /**
    * Default constructor
    */
-  TopologyManager()
-    : HiCR::TopologyManager()
+  TopologyManager(HiCR::backend::cloudr::InstanceManager* instanceManager)
+    : HiCR::TopologyManager(),
+      _instanceManager(instanceManager)
   {}
 
   /**
@@ -55,16 +57,17 @@ class TopologyManager final : public HiCR::TopologyManager
    */
   ~TopologyManager() = default;
 
-  __INLINE__ void setTopologyJs(const nlohmann::json &topologyJs) { _topologyJs = topologyJs; }
-
   __INLINE__ HiCR::Topology queryTopology() override
   {
-    // Storage for the topology to return
     HiCR::Topology t;
 
-    if (_topologyJs == "") return t;
+    // Getting emulated topology from cloudR instance manager 
+    auto topologyJs = _instanceManager->getLocalInstanceTopologyJs();
 
-    const auto &devicesJs = hicr::json::getArray<nlohmann::json>(_topologyJs, "Devices");
+    if (topologyJs == "") return t;
+
+    // Creating Topology object
+    const auto &devicesJs = hicr::json::getArray<nlohmann::json>(topologyJs, "Devices");
     for (const auto &deviceJs : devicesJs) t.addDevice(std::make_shared<HiCR::Device>(deviceJs));
 
     // Returning topology
@@ -102,8 +105,8 @@ class TopologyManager final : public HiCR::TopologyManager
 
   private:
 
-  /// Already serialized topology
-  nlohmann::json _topologyJs;
+  /// CloudR instance manager from whence we will obtain the local instance's topology
+  HiCR::backend::cloudr::InstanceManager* const _instanceManager;
 };
 
 } // namespace HiCR::backend::cloudr
