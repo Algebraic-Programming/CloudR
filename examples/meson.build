@@ -1,1 +1,1 @@
-subdir('template')
+subdir('clone')

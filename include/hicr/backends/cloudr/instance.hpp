@@ -52,16 +52,8 @@ class Instance final : public HiCR::Instance
 
   [[nodiscard]] __INLINE__ bool isRootInstance() const override { return _isRoot; };
 
-  __INLINE__ void setTopology(const nlohmann::json &topologyJs)
-  {
-    _topologyJs = topologyJs;
-
-    const auto &devicesJs = hicr::json::getArray<nlohmann::json>(topologyJs, "Devices");
-    _topology             = HiCR::Topology();
-    for (const auto &deviceJs : devicesJs) _topology.addDevice(std::make_shared<HiCR::Device>(deviceJs));
-  }
-
-  __INLINE__ nlohmann::json &getTopologyJs() { return _topologyJs; }
+  __INLINE__ void setTopology(const HiCR::Topology &topology) { _topology = topology; }
+  __INLINE__ HiCR::Topology getTopology() const { return _topology; }
 
   /**
   * Checks whether this instance satisfied a certain instance type.
@@ -79,9 +71,6 @@ class Instance final : public HiCR::Instance
   __INLINE__ HiCR::Instance *getBaseInstance() const { return _baseInstance; }
 
   private:
-
-  /// Already serialized topology
-  nlohmann::json _topologyJs;
 
   /// Emulated topology for this instance
   HiCR::Topology _topology;
