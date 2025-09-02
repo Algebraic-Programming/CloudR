@@ -66,7 +66,7 @@ class Instance final : public HiCR::Instance
   * 
   * @return true, if this instance satisfies the instance type; false, otherwise.
   */
-  [[nodiscard]] __INLINE__ bool isCompatible(const HiCR::Topology requestedTopology) { return _topology.isSubset(requestedTopology); }
+  [[nodiscard]] __INLINE__ bool isCompatible(const HiCR::Topology requestedTopology) { return _topology.isSubset(_topology, requestedTopology); }
 
   __INLINE__ HiCR::Instance *getBaseInstance() const { return _baseInstance; }
 
