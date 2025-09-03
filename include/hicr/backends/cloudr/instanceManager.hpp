@@ -15,6 +15,9 @@ namespace HiCR::backend::cloudr
 class CommunicationManager;
 class TopologyManager;
 
+/**
+ * Instance manager for CloudR
+*/
 class InstanceManager final : public HiCR::InstanceManager
 {
   friend TopologyManager;
@@ -28,16 +31,30 @@ class InstanceManager final : public HiCR::InstanceManager
 #define __CLOUDR_EXCHANGE_GLOBAL_MEMORY_SLOTS_RPC_NAME "[CloudR] Exchange Global Memory Slots"
 #define __CLOUDR_FENCE_RPC_NAME "[CloudR] Fence"
 
+  /**
+   * Type for any entrypoint function
+  */
   typedef std::function<void(void)> entryPoint_t;
 
-  InstanceManager(HiCR::frontend::RPCEngine* rpcEngine, const HiCR::Topology localTopology, entryPoint_t entryPoint): HiCR::InstanceManager(),
-     _rpcEngine(rpcEngine),
-     _localTopology(localTopology),
-     _entryPoint(entryPoint)
-      {}
+  /**
+   * Constructor
+   * 
+   * @param[in] rpcEngine
+   * @param[in] localTopology
+   * @param[in] entryPoint
+  */
+  InstanceManager(HiCR::frontend::RPCEngine *rpcEngine, const HiCR::Topology localTopology, entryPoint_t entryPoint)
+    : HiCR::InstanceManager(),
+      _rpcEngine(rpcEngine),
+      _localTopology(localTopology),
+      _entryPoint(entryPoint)
+  {}
 
   ~InstanceManager() = default;
 
+  /**
+   * Initialize the instance manager. Registers RPCs, stores available instances, detects the root instance, executes the entrypoint
+  */
   __INLINE__ void initialize()
   {
     // Registering Topology gathering function
@@ -74,7 +91,7 @@ class InstanceManager final : public HiCR::InstanceManager
       _cloudrInstances.push_back(newInstance);
 
       // If this is the current instance, set it now
-      if (instance->getId() == _rpcEngine->getInstanceManager()->getCurrentInstance()->getId()) 
+      if (instance->getId() == _rpcEngine->getInstanceManager()->getCurrentInstance()->getId())
       {
         // Set as current instance
         setCurrentInstance(newInstance);
@@ -119,7 +136,7 @@ class InstanceManager final : public HiCR::InstanceManager
     else // If I am root, do the following instead
     {
       // Gather the topologies of all other instances
-      for (auto& instance : _freeInstances)
+      for (auto &instance : _freeInstances)
       {
         // Requesting the root
         _rpcEngine->requestRPC(*instance, __CLOUDR_GATHER_TOPOLOGIES_RPC_NAME);
@@ -147,6 +164,9 @@ class InstanceManager final : public HiCR::InstanceManager
     }
   }
 
+  /**
+   * Finalization procedure. Send rpc termination to all the non root instances
+  */
   __INLINE__ void finalize() override
   {
     // printf("[Instance %lu] Finalizing CloudR...\n", _rpcEngine->getInstanceManager()->getCurrentInstance()->getId());
@@ -159,14 +179,39 @@ class InstanceManager final : public HiCR::InstanceManager
     }
   }
 
+  /**
+   * Abort execution with the specifies error code
+   * 
+   * @param[in] errorCode
+  */
   __INLINE__ void abort(int errorCode) override { _rpcEngine->getInstanceManager()->abort(errorCode); }
 
+  /**
+   * Getter for root instance id
+   * 
+   * @return root instance id
+  */
   [[nodiscard]] __INLINE__ HiCR::Instance::instanceId_t getRootInstanceId() const override { return _rootInstance->getId(); }
-  [[nodiscard]] __INLINE__ auto        getRPCEngine() const { return _rpcEngine; }
+
+  /**
+   * Getter for rpc engine 
+   * 
+   * @return rpc engine 
+  */
+  [[nodiscard]] __INLINE__ auto getRPCEngine() const { return _rpcEngine; }
+
+  /**
+   * Getter for free instances
+   * 
+   * @return free instances 
+  */
   [[nodiscard]] __INLINE__ const auto &getFreeInstances() const { return _freeInstances; }
 
   private:
-  
+
+  /**
+   * Response to gather topology rpc
+  */
   __INLINE__ void gatherTopologies()
   {
     // Getting my current instance's topology
@@ -224,18 +269,31 @@ class InstanceManager final : public HiCR::InstanceManager
     HICR_THROW_LOGIC("The Host backend does not currently support the detection of new instances during runtime");
   }
 
+  /**
+   * Request exchange memory slots rpc
+   * 
+   * @param[in] tag the global memory slot tag to exchange
+  */
   __INLINE__ void requestExchangeGlobalMemorySlots(HiCR::GlobalMemorySlot::tag_t tag)
   {
     // Asking free instances to run the exchange RPC
     for (const auto &instance : _freeInstances) _rpcEngine->requestRPC(*instance, __CLOUDR_EXCHANGE_GLOBAL_MEMORY_SLOTS_RPC_NAME, tag);
   }
 
+  /**
+   * Request fence rpc
+   * 
+   * @param[in] tag the global memory slot tag to fence
+  */
   __INLINE__ void requestFence(HiCR::GlobalMemorySlot::tag_t tag)
   {
     // Asking free instances to run the exchange RPC
     for (const auto &instance : _freeInstances) _rpcEngine->requestRPC(*instance, __CLOUDR_FENCE_RPC_NAME, tag);
   }
 
+  /**
+   * Response to request topology rpc
+  */
   __INLINE__ void requestTopology()
   {
     // Getting a pointer to the base instance who made the request
@@ -254,6 +312,9 @@ class InstanceManager final : public HiCR::InstanceManager
     _rpcEngine->submitReturnValue((void *)serializedTopology.c_str(), serializedTopology.size() + 1);
   }
 
+  /**
+   * Exit the worker rpc main loop and terminate execution
+  */
   __INLINE__ void finalizeWorker()
   {
     // Do not continue listening
@@ -261,12 +322,18 @@ class InstanceManager final : public HiCR::InstanceManager
     _continueListening = false;
   }
 
+  /**
+   * rpc for exchange memory slots
+  */
   __INLINE__ void exchangeGlobalMemorySlotsRPC()
   {
     const auto exchangeTag = _rpcEngine->getRPCArgument();
     _rpcEngine->getCommunicationManager()->exchangeGlobalMemorySlots(exchangeTag, {});
   }
 
+  /**
+   * rpc for fence 
+  */
   __INLINE__ void fenceRPC()
   {
     const auto exchangeTag = _rpcEngine->getRPCArgument();
@@ -274,7 +341,7 @@ class InstanceManager final : public HiCR::InstanceManager
   }
 
   /// RPC engine
-  HiCR::frontend::RPCEngine* const _rpcEngine;
+  HiCR::frontend::RPCEngine *const _rpcEngine;
 
   /// Storage for this instance's emulated topology
   const HiCR::Topology _localTopology;

@@ -29,15 +29,17 @@ namespace HiCR::backend::cloudr
 {
 
 /**
- * This class represents an abstract definition for a HICR instance as represented by the MPI backend:
+ * This class represents an abstract definition for a HICR instance as represented by the Cloudr backend:
  */
 class Instance final : public HiCR::Instance
 {
   public:
 
   /**
-   * Constructor for a Instance class for the MPI backend
-   * \param[in] instanceId The base instance identifier corresponding to this HiCR instance
+   * Constructor for a Instance class for the CloudR backend
+   * \param[in] instanceId The instance identifier corresponding to this HiCR instance
+   * \param[in] baseInstance The base instance corresponding to this HiCR instance
+   * \param[in] isRoot whether the instance is root
    */
   Instance(const instanceId_t instanceId, HiCR::Instance *const baseInstance, const bool isRoot)
     : HiCR::Instance(instanceId),
@@ -50,9 +52,23 @@ class Instance final : public HiCR::Instance
    */
   ~Instance() override = default;
 
+  /**
+   * \return whether the current instance is root
+  */
   [[nodiscard]] __INLINE__ bool isRootInstance() const override { return _isRoot; };
 
+  /**
+   * Set the instance topology
+   * 
+   * \param[in] topology
+  */
   __INLINE__ void setTopology(const HiCR::Topology &topology) { _topology = topology; }
+
+  /**
+   * Topology getter
+   * 
+   * \return instance topology
+  */
   __INLINE__ HiCR::Topology getTopology() const { return _topology; }
 
   /**
@@ -62,12 +78,17 @@ class Instance final : public HiCR::Instance
   * The devices are checked in order. That is the first instance device that satisfies a requested device
   * will be removed from the list when checking the next requested device.
   * 
-  * @param[in] instanceType The instance type requested to check for
+  * @param[in] requestedTopology The topology to check for
   * 
   * @return true, if this instance satisfies the instance type; false, otherwise.
   */
   [[nodiscard]] __INLINE__ bool isCompatible(const HiCR::Topology requestedTopology) { return _topology.isSubset(_topology, requestedTopology); }
 
+  /**
+   * Getter for base instance, not the emulated one
+   * 
+   * \return pointer to instance
+  */
   __INLINE__ HiCR::Instance *getBaseInstance() const { return _baseInstance; }
 
   private:
