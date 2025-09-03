@@ -30,11 +30,12 @@ class InstanceManager final : public HiCR::InstanceManager
 
   typedef std::function<void(void)> entryPoint_t;
 
-  InstanceManager(HiCR::frontend::RPCEngine* rpcEngine, const HiCR::Topology localTopology, entryPoint_t entryPoint): HiCR::InstanceManager(),
-     _rpcEngine(rpcEngine),
-     _localTopology(localTopology),
-     _entryPoint(entryPoint)
-      {}
+  InstanceManager(HiCR::frontend::RPCEngine *rpcEngine, const HiCR::Topology localTopology, entryPoint_t entryPoint)
+    : HiCR::InstanceManager(),
+      _rpcEngine(rpcEngine),
+      _localTopology(localTopology),
+      _entryPoint(entryPoint)
+  {}
 
   ~InstanceManager() = default;
 
@@ -74,7 +75,7 @@ class InstanceManager final : public HiCR::InstanceManager
       _cloudrInstances.push_back(newInstance);
 
       // If this is the current instance, set it now
-      if (instance->getId() == _rpcEngine->getInstanceManager()->getCurrentInstance()->getId()) 
+      if (instance->getId() == _rpcEngine->getInstanceManager()->getCurrentInstance()->getId())
       {
         // Set as current instance
         setCurrentInstance(newInstance);
@@ -119,7 +120,7 @@ class InstanceManager final : public HiCR::InstanceManager
     else // If I am root, do the following instead
     {
       // Gather the topologies of all other instances
-      for (auto& instance : _freeInstances)
+      for (auto &instance : _freeInstances)
       {
         // Requesting the root
         _rpcEngine->requestRPC(*instance, __CLOUDR_GATHER_TOPOLOGIES_RPC_NAME);
@@ -162,11 +163,11 @@ class InstanceManager final : public HiCR::InstanceManager
   __INLINE__ void abort(int errorCode) override { _rpcEngine->getInstanceManager()->abort(errorCode); }
 
   [[nodiscard]] __INLINE__ HiCR::Instance::instanceId_t getRootInstanceId() const override { return _rootInstance->getId(); }
-  [[nodiscard]] __INLINE__ auto        getRPCEngine() const { return _rpcEngine; }
-  [[nodiscard]] __INLINE__ const auto &getFreeInstances() const { return _freeInstances; }
+  [[nodiscard]] __INLINE__ auto                         getRPCEngine() const { return _rpcEngine; }
+  [[nodiscard]] __INLINE__ const auto                  &getFreeInstances() const { return _freeInstances; }
 
   private:
-  
+
   __INLINE__ void gatherTopologies()
   {
     // Getting my current instance's topology
@@ -274,7 +275,7 @@ class InstanceManager final : public HiCR::InstanceManager
   }
 
   /// RPC engine
-  HiCR::frontend::RPCEngine* const _rpcEngine;
+  HiCR::frontend::RPCEngine *const _rpcEngine;
 
   /// Storage for this instance's emulated topology
   const HiCR::Topology _localTopology;

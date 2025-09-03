@@ -7,7 +7,7 @@
 #include <hicr/backends/mpi/instanceManager.hpp>
 #include <hicr/backends/hwloc/topologyManager.hpp>
 
-void entryPoint(HiCR::backend::cloudr::InstanceManager& cloudr, const HiCR::Topology& localTopology)
+void entryPoint(HiCR::backend::cloudr::InstanceManager &cloudr, const HiCR::Topology &localTopology)
 {
   printf("[Instance %lu] I am in the entry point.\n", cloudr.getCurrentInstance()->getId());
 
@@ -25,10 +25,10 @@ void entryPoint(HiCR::backend::cloudr::InstanceManager& cloudr, const HiCR::Topo
 int main(int argc, char *argv[])
 {
   // Instantiating base managers
-  auto instanceManager         = HiCR::backend::mpi::InstanceManager::createDefault(&argc, &argv);
-  auto communicationManager    = HiCR::backend::mpi::CommunicationManager(MPI_COMM_WORLD);
-  auto memoryManager           = HiCR::backend::mpi::MemoryManager();
-  auto computeManager          = HiCR::backend::pthreads::ComputeManager();
+  auto instanceManager      = HiCR::backend::mpi::InstanceManager::createDefault(&argc, &argv);
+  auto communicationManager = HiCR::backend::mpi::CommunicationManager(MPI_COMM_WORLD);
+  auto memoryManager        = HiCR::backend::mpi::MemoryManager();
+  auto computeManager       = HiCR::backend::pthreads::ComputeManager();
 
   // Reserving memory for hwloc
   hwloc_topology_t hwlocTopology;
@@ -38,11 +38,11 @@ int main(int argc, char *argv[])
   auto hwlocTopologyManager = HiCR::backend::hwloc::TopologyManager(&hwlocTopology);
 
   // Finding the first memory space and compute resource to create our RPC engine
-  const auto& topology           = hwlocTopologyManager.queryTopology();
-  const auto& firstDevice        = topology.getDevices().begin().operator*();
-  const auto& RPCMemorySpace     = firstDevice->getMemorySpaceList().begin().operator*();
-  const auto& RPCComputeResource = firstDevice->getComputeResourceList().begin().operator*();
-  
+  const auto &topology           = hwlocTopologyManager.queryTopology();
+  const auto &firstDevice        = topology.getDevices().begin().operator*();
+  const auto &RPCMemorySpace     = firstDevice->getMemorySpaceList().begin().operator*();
+  const auto &RPCComputeResource = firstDevice->getComputeResourceList().begin().operator*();
+
   // Instantiating RPC engine
   HiCR::frontend::RPCEngine rpcEngine(communicationManager, *instanceManager, memoryManager, computeManager, RPCMemorySpace, RPCComputeResource);
 

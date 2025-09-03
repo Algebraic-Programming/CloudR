@@ -4,9 +4,9 @@ if command -v arch &>/dev/null; then
    target_arch=$(arch)
 
    if [ $target_arch == "aarch64" ]; then
-      target_arch="arm64v8"
+      target_arch="arm64"
    else
-      target_arch="x86_64"
+      target_arch="amd64"
    fi
 else
    if [[ $# -ne 2 ]]; then
