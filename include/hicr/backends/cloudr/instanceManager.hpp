@@ -24,6 +24,7 @@ class InstanceManager final : public HiCR::InstanceManager
 
 #define __CLOUDR_GATHER_TOPOLOGIES_RPC_NAME "[CloudR] Gather Topologies"
 #define __CLOUDR_LAUNCH_ENTRY_POINT_RPC_NAME "[CloudR] Launch Main"
+#define __CLOUDR_RELINQUISH_INSTANCE_RPC_NAME "[CloudR] Relinquish Instance"
 #define __CLOUDR_FINALIZE_WORKER_RPC_NAME "[CloudR] Finalize Worker"
 #define __CLOUDR_EXCHANGE_GLOBAL_MEMORY_SLOTS_RPC_NAME "[CloudR] Exchange Global Memory Slots"
 #define __CLOUDR_FENCE_RPC_NAME "[CloudR] Fence"
@@ -47,6 +48,10 @@ class InstanceManager final : public HiCR::InstanceManager
     // Registering launch function
     auto launchEntryPointExecutionUnit = HiCR::backend::pthreads::ComputeManager::createExecutionUnit([this](void *) { _entryPoint(); });
     _rpcEngine->addRPCTarget(__CLOUDR_LAUNCH_ENTRY_POINT_RPC_NAME, launchEntryPointExecutionUnit);
+
+    // Registering relinquish instance function
+    auto relinquishInstanceExecutionUnit = HiCR::backend::pthreads::ComputeManager::createExecutionUnit([this](void *) { relinquishInstance(); });
+    _rpcEngine->addRPCTarget(__CLOUDR_RELINQUISH_INSTANCE_RPC_NAME, relinquishInstanceExecutionUnit);
 
     // Registering finalize function
     auto finalizeWorkerExecutionUnit = HiCR::backend::pthreads::ComputeManager::createExecutionUnit([this](void *) { finalizeWorker(); });
@@ -94,7 +99,7 @@ class InstanceManager final : public HiCR::InstanceManager
       }
 
       // If not root, add to the list of free instances (can be activated later)
-      if (isRoot == false) _freeInstances.insert(newInstance);
+      if (isRoot == false) _freeInstances.insert(newInstance.get());
 
       // Linking base instance id to the respective cloudr instance
       _baseIdsToCloudrInstanceMap[instance->getId()] = newInstance.get();
@@ -147,6 +152,32 @@ class InstanceManager final : public HiCR::InstanceManager
     }
   }
 
+  /**
+   * This function is the RPC that a running instance receives when it is relinquished.
+   * 
+   * It does not terminate the worker, but simply confirms the instance is not running.
+   */
+  __INLINE__ void relinquishInstance()
+  {
+    // printf("Relinquishing...\n");
+
+    // Returning confirmation that we are no longer running a function (idle)
+    int returnOkMessage = 0;
+    _rpcEngine->submitReturnValue((void *)&returnOkMessage, sizeof(returnOkMessage));
+  }
+
+   __INLINE__ void terminateInstanceImpl(const std::shared_ptr<HiCR::Instance> instance) override
+   {
+    // Requesting relinquish RPC execution on the requested instance
+    _rpcEngine->requestRPC(*instance, __CLOUDR_RELINQUISH_INSTANCE_RPC_NAME);
+
+    // Getting return value. It's enough to know a value was returned to know it is idling
+    const auto returnValue = _rpcEngine->getReturnValue(*instance);
+
+    // Adding instance back to free instances
+    _freeInstances.insert(_baseIdsToCloudrInstanceMap[instance->getId()]);
+   }
+
   __INLINE__ void finalize() override
   {
     // printf("[Instance %lu] Finalizing CloudR...\n", _rpcEngine->getInstanceManager()->getCurrentInstance()->getId());
@@ -196,7 +227,7 @@ class InstanceManager final : public HiCR::InstanceManager
       if (instance->isCompatible(topology))
       {
         // Assigning it as compatible instance
-        newInstance = instance;
+        newInstance = std::make_shared<HiCR::backend::cloudr::Instance>(*instance);
 
         // Erasing it from the list of free instances
         _freeInstances.erase(instance);
@@ -295,7 +326,7 @@ class InstanceManager final : public HiCR::InstanceManager
   std::vector<std::shared_ptr<HiCR::backend::cloudr::Instance>> _cloudrInstances;
 
   /// A collection of ready-to-use instances currently on standby
-  std::set<std::shared_ptr<HiCR::backend::cloudr::Instance>> _freeInstances;
+  std::set<HiCR::backend::cloudr::Instance*> _freeInstances;
 }; // class CloudR
 
 } // namespace HiCR::backend::cloudr
