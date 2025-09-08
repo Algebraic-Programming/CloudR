@@ -1,5 +1,5 @@
 build:
-  image: registry.gitlab.huaweirc.ch/zrc-von-neumann-lab/runtime-system-innovations/llm-engine/buildenv-x86_64:latest
+  image: registry.gitlab.huaweirc.ch/zrc-von-neumann-lab/runtime-system-innovations/cloudr/buildenv:latest
   variables:
     GIT_SUBMODULE_STRATEGY: recursive
   tags:
@@ -9,9 +9,9 @@ build:
   script:
   - export HOME=/home/hicr
   - source /home/hicr/.hicr-env.sh
-  - echo "Building LLM-Engine..."
+  - echo "Building CloudR..."
   - mkdir build
-  - meson setup build -Dbuildtype=debug -Db_coverage=true -DbuildTests=true -DbuildExamples=true -DdistributedEngine=mpi -DbuildInstrumentation=true -DcompileWarningsAsErrors=true
+  - meson setup build -Dbuildtype=debug -Db_coverage=true -DbuildTests=true -DbuildExamples=true -DcompileWarningsAsErrors=true
   - meson compile -C build
   - echo "Running tests..."
   - meson test -C build
@@ -29,12 +29,12 @@ build:
         coverage_format: cobertura
         path: build/meson-logs/coverage.xml 
   only:
-  - main
+  - master
   - merge_requests
   - tags
 
 docs:
-  image: registry.gitlab.huaweirc.ch/zrc-von-neumann-lab/runtime-system-innovations/hicr/docs:latest
+  image: registry.gitlab.huaweirc.ch/zrc-von-neumann-lab/runtime-system-innovations/hicr/docs:1.0
   tags:
   - docker
   - tiny
@@ -46,7 +46,7 @@ docs:
   - echo "Building code documentation..."
   - make -j1 -C docs
   only: 
-  - main
+  - master
   - merge_requests
   - tags
 
