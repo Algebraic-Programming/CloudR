@@ -124,19 +124,13 @@ class InstanceManager final : public HiCR::InstanceManager
       // Increasing cloudr instance Id
       instanceIdCounter++;
     }
-    // printf("[CloudR] Worker %lu finished.\n", _rpcEngine->getInstanceManager()->getCurrentInstance()->getId());
 
     ///// Now deploying
 
     // If I'm worker, all I need to do is listen for incoming RPCs
     if (_rpcEngine->getInstanceManager()->getCurrentInstance()->isRootInstance() == false)
     {
-      while (_continueListening)
-      {
-        // printf("[CloudR] Worker %lu listening...\n", _rpcEngine->getInstanceManager()->getCurrentInstance()->getId());
-        _rpcEngine->listen();
-        // printf("[CloudR] Worker %lu back from listening...\n", _rpcEngine->getInstanceManager()->getCurrentInstance()->getId());
-      }
+      while (_continueListening) { _rpcEngine->listen(); }
     }
     else // If I am root, do the following instead
     {
@@ -144,10 +138,10 @@ class InstanceManager final : public HiCR::InstanceManager
       for (auto &instance : _freeInstances)
       {
         // Requesting the root
-        _rpcEngine->requestRPC(*instance, __CLOUDR_GATHER_TOPOLOGIES_RPC_NAME);
+        _rpcEngine->requestRPC(instance->getId(), __CLOUDR_GATHER_TOPOLOGIES_RPC_NAME);
 
         // Getting return value (topology)
-        auto returnValue = _rpcEngine->getReturnValue(*instance);
+        auto returnValue = _rpcEngine->getReturnValue();
 
         // Receiving raw serialized topology information from the worker
         std::string serializedTopology = (char *)returnValue->getPointer();
@@ -164,8 +158,6 @@ class InstanceManager final : public HiCR::InstanceManager
 
       // Then go straight to the entry point
       _entryPoint();
-
-      // printf("[Root %lu] Exited entry point...\n", _rpcEngine->getInstanceManager()->getCurrentInstance()->getId());
     }
   }
 
@@ -183,30 +175,28 @@ class InstanceManager final : public HiCR::InstanceManager
     _rpcEngine->submitReturnValue((void *)&returnOkMessage, sizeof(returnOkMessage));
   }
 
-   __INLINE__ void terminateInstanceImpl(const std::shared_ptr<HiCR::Instance> instance) override
-   {
+  __INLINE__ void terminateInstanceImpl(const std::shared_ptr<HiCR::Instance> instance) override
+  {
     // Requesting relinquish RPC execution on the requested instance
-    _rpcEngine->requestRPC(*instance, __CLOUDR_RELINQUISH_INSTANCE_RPC_NAME);
+    _rpcEngine->requestRPC(instance->getId(), __CLOUDR_RELINQUISH_INSTANCE_RPC_NAME);
 
     // Getting return value. It's enough to know a value was returned to know it is idling
-    const auto returnValue = _rpcEngine->getReturnValue(*instance);
+    const auto returnValue = _rpcEngine->getReturnValue();
 
     // Adding instance back to free instances
     _freeInstances.insert(_baseIdsToCloudrInstanceMap[instance->getId()]);
-   }
+  }
 
   /**
    * Finalization procedure. Send rpc termination to all the non root instances
   */
   __INLINE__ void finalize() override
   {
-    // printf("[Instance %lu] Finalizing CloudR...\n", _rpcEngine->getInstanceManager()->getCurrentInstance()->getId());
-
     // The following only be ran by the root rank, send an RPC to all others to finalize them
     if (_rpcEngine->getInstanceManager()->getCurrentInstance()->isRootInstance())
     {
       for (auto &instance : _cloudrInstances)
-        if (instance->isRootInstance() == false) _rpcEngine->requestRPC(*instance, __CLOUDR_FINALIZE_WORKER_RPC_NAME);
+        if (instance->isRootInstance() == false) _rpcEngine->requestRPC(instance->getId(), __CLOUDR_FINALIZE_WORKER_RPC_NAME);
     }
   }
 
@@ -257,10 +247,6 @@ class InstanceManager final : public HiCR::InstanceManager
 
   __INLINE__ std::shared_ptr<HiCR::Instance> createInstanceImpl(const HiCR::InstanceTemplate instanceTemplate) override
   {
-    // If no more free instances available, fail now
-    // Commented out because we don't want to fail, simply return a nullptr
-    // if (_freeInstances.empty()) HICR_THROW_LOGIC("Requested the creation of a new instances, but CloudR has ran out of free instances");
-
     // Creating instance object to return
     std::shared_ptr<HiCR::backend::cloudr::Instance> newInstance = nullptr;
 
@@ -281,14 +267,11 @@ class InstanceManager final : public HiCR::InstanceManager
         break;
       }
 
-    // Commented out because we don't want to fail, simply return a nullptr
-    // if (newInstance == nullptr)  HICR_THROW_LOGIC("Tried to create new instance but did not find any free instances that meet the required topology");
-
     // If successful, initialize the new instance
     if (newInstance != nullptr)
     {
       // Request the execution of the main driver function
-      _rpcEngine->requestRPC(*newInstance->getBaseInstance(), __CLOUDR_LAUNCH_ENTRY_POINT_RPC_NAME);
+      _rpcEngine->requestRPC(newInstance->getBaseInstance()->getId(), __CLOUDR_LAUNCH_ENTRY_POINT_RPC_NAME);
     }
 
     // Returning result. Nullptr, if no instance was created
@@ -308,7 +291,7 @@ class InstanceManager final : public HiCR::InstanceManager
   __INLINE__ void requestExchangeGlobalMemorySlots(HiCR::GlobalMemorySlot::tag_t tag)
   {
     // Asking free instances to run the exchange RPC
-    for (const auto &instance : _freeInstances) _rpcEngine->requestRPC(*instance, __CLOUDR_EXCHANGE_GLOBAL_MEMORY_SLOTS_RPC_NAME, tag);
+    for (const auto &instance : _freeInstances) _rpcEngine->requestRPC(instance->getId(), __CLOUDR_EXCHANGE_GLOBAL_MEMORY_SLOTS_RPC_NAME, tag);
   }
 
   /**
@@ -319,7 +302,7 @@ class InstanceManager final : public HiCR::InstanceManager
   __INLINE__ void requestFence(HiCR::GlobalMemorySlot::tag_t tag)
   {
     // Asking free instances to run the exchange RPC
-    for (const auto &instance : _freeInstances) _rpcEngine->requestRPC(*instance, __CLOUDR_FENCE_RPC_NAME, tag);
+    for (const auto &instance : _freeInstances) _rpcEngine->requestRPC(instance->getId(), __CLOUDR_FENCE_RPC_NAME, tag);
   }
 
   /**
@@ -349,7 +332,6 @@ class InstanceManager final : public HiCR::InstanceManager
   __INLINE__ void finalizeWorker()
   {
     // Do not continue listening
-    // printf("[CloudR] Worker %lu running finalizeWorker() RPC.\n", _rpcEngine->getInstanceManager()->getCurrentInstance()->getId());
     _continueListening = false;
   }
 
@@ -393,7 +375,7 @@ class InstanceManager final : public HiCR::InstanceManager
   std::vector<std::shared_ptr<HiCR::backend::cloudr::Instance>> _cloudrInstances;
 
   /// A collection of ready-to-use instances currently on standby
-  std::set<HiCR::backend::cloudr::Instance*> _freeInstances;
+  std::set<HiCR::backend::cloudr::Instance *> _freeInstances;
 }; // class CloudR
 
 } // namespace HiCR::backend::cloudr
