@@ -1,4 +1,4 @@
-CloudR is a [HiCR](https://github.com/Algebraic-Programming/HiCR)-based Cloud service emulator.
+CloudR is a [HiCR](https://github.com/Algebraic-Programming/HiCR)-based Cloud service emulator. It is able to emulate multiple instances, accepting arbitrary topologies.
 
 ## License
 
