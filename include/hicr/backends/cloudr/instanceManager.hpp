@@ -44,9 +44,10 @@ class InstanceManager final : public HiCR::InstanceManager
    * @param[in] localTopology
    * @param[in] entryPoint
   */
-  InstanceManager(HiCR::frontend::RPCEngine *rpcEngine, const HiCR::Topology localTopology, entryPoint_t entryPoint)
+  InstanceManager(HiCR::frontend::RPCEngine *rpcEngine, HiCR::ComputeManager *const computeManager, const HiCR::Topology localTopology, entryPoint_t entryPoint)
     : HiCR::InstanceManager(),
       _rpcEngine(rpcEngine),
+      _computeManager(computeManager),
       _localTopology(localTopology),
       _entryPoint(entryPoint)
   {}
@@ -59,27 +60,27 @@ class InstanceManager final : public HiCR::InstanceManager
   __INLINE__ void initialize()
   {
     // Registering Topology gathering function
-    auto gatherTopologiesExecutionUnit = HiCR::backend::pthreads::ComputeManager::createExecutionUnit([this](void *) { gatherTopologies(); });
+    auto gatherTopologiesExecutionUnit = _computeManager->createExecutionUnit([this](void *) { gatherTopologies(); });
     _rpcEngine->addRPCTarget(__CLOUDR_GATHER_TOPOLOGIES_RPC_NAME, gatherTopologiesExecutionUnit);
 
     // Registering launch function
-    auto launchEntryPointExecutionUnit = HiCR::backend::pthreads::ComputeManager::createExecutionUnit([this](void *) { _entryPoint(); });
+    auto launchEntryPointExecutionUnit = _computeManager->createExecutionUnit([this](void *) { _entryPoint(); });
     _rpcEngine->addRPCTarget(__CLOUDR_LAUNCH_ENTRY_POINT_RPC_NAME, launchEntryPointExecutionUnit);
 
     // Registering relinquish instance function
-    auto relinquishInstanceExecutionUnit = HiCR::backend::pthreads::ComputeManager::createExecutionUnit([this](void *) { relinquishInstance(); });
+    auto relinquishInstanceExecutionUnit = _computeManager->createExecutionUnit([this](void *) { relinquishInstance(); });
     _rpcEngine->addRPCTarget(__CLOUDR_RELINQUISH_INSTANCE_RPC_NAME, relinquishInstanceExecutionUnit);
 
     // Registering finalize function
-    auto finalizeWorkerExecutionUnit = HiCR::backend::pthreads::ComputeManager::createExecutionUnit([this](void *) { finalizeWorker(); });
+    auto finalizeWorkerExecutionUnit = _computeManager->createExecutionUnit([this](void *) { finalizeWorker(); });
     _rpcEngine->addRPCTarget(__CLOUDR_FINALIZE_WORKER_RPC_NAME, finalizeWorkerExecutionUnit);
 
     // Registering exchange global memory slots RPC
-    auto exchangeGlobalMemorySlotsExecutionUnit = HiCR::backend::pthreads::ComputeManager::createExecutionUnit([this](void *) { exchangeGlobalMemorySlotsRPC(); });
+    auto exchangeGlobalMemorySlotsExecutionUnit = _computeManager->createExecutionUnit([this](void *) { exchangeGlobalMemorySlotsRPC(); });
     _rpcEngine->addRPCTarget(__CLOUDR_EXCHANGE_GLOBAL_MEMORY_SLOTS_RPC_NAME, exchangeGlobalMemorySlotsExecutionUnit);
 
     // Registering global fence
-    auto fenceExecutionUnit = HiCR::backend::pthreads::ComputeManager::createExecutionUnit([this](void *) { fenceRPC(); });
+    auto fenceExecutionUnit = _computeManager->createExecutionUnit([this](void *) { fenceRPC(); });
     _rpcEngine->addRPCTarget(__CLOUDR_FENCE_RPC_NAME, fenceExecutionUnit);
 
     // Creating instance objects from the initially found instances now
@@ -355,6 +356,9 @@ class InstanceManager final : public HiCR::InstanceManager
 
   /// RPC engine
   HiCR::frontend::RPCEngine *const _rpcEngine;
+
+  // Compute manager
+  HiCR::ComputeManager *const _computeManager;
 
   /// Storage for this instance's emulated topology
   const HiCR::Topology _localTopology;
