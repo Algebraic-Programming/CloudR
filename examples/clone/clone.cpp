@@ -50,7 +50,7 @@ int main(int argc, char *argv[])
   rpcEngine.initialize();
 
   // Instantiating CloudR
-  HiCR::backend::cloudr::InstanceManager cloudrInstanceManager(&rpcEngine, topology, [&]() { entryPoint(cloudrInstanceManager, topology); });
+  HiCR::backend::cloudr::InstanceManager cloudrInstanceManager(&rpcEngine, &computeManager, topology, [&]() { entryPoint(cloudrInstanceManager, topology); });
 
   // Initializing CloudR
   cloudrInstanceManager.initialize();
